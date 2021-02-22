@@ -1,10 +1,12 @@
-#include "indiDisp.h"
-#include "DS1307.h"
+//----------------Библиотеки----------------
 #include <avr/sleep.h>
 #include <avr/power.h>
 
-#define BTN_GIST_TICK    2   //количество циклов для защиты от дребезга(0..255)(1 цикл -> +-17.5мс)
-#define BTN_HOLD_TICK    30  //количество циклов после которого считается что кнопка зажата(0..255)(1 цикл -> +-17.5мс)
+//---------------Конфигурации---------------
+#include "config.h"
+#include "connection.h"
+#include "indiDisp.h"
+#include "DS1307.h"
 
 //переменные обработки кнопок
 uint8_t btn_tmr; //таймер тиков обработки
@@ -20,53 +22,6 @@ uint32_t timer_millis; //таймер отсчета миллисекунд
 int atexit(void (* /*func*/ )()) { //инициализация функций
   return 0;
 }
-
-#define DDR_REG(portx)  (*(&portx-1))
-
-//назначаем кнопки//
-//пин кнопки RIGHT D2
-#define RIGHT_BIT   2 // D2
-#define RIGHT_PORT  PORTD
-#define RIGHT_PIN   PIND
-
-#define RIGHT_OUT   (bitRead(RIGHT_PIN, RIGHT_BIT))
-#define RIGHT_SET   (bitSet(RIGHT_PORT, RIGHT_BIT))
-#define RIGHT_INP   (bitClear((DDR_REG(RIGHT_PORT)), RIGHT_BIT))
-
-#define RIGHT_INIT  RIGHT_SET; RIGHT_INP
-
-//пин кнопки LEFT D0
-#define LEFT_BIT   0 // D0
-#define LEFT_PORT  PORTD
-#define LEFT_PIN   PIND
-
-#define LEFT_OUT   (bitRead(LEFT_PIN, LEFT_BIT))
-#define LEFT_SET   (bitSet(LEFT_PORT, LEFT_BIT))
-#define LEFT_INP   (bitClear((DDR_REG(LEFT_PORT)), LEFT_BIT))
-
-#define LEFT_INIT  LEFT_SET; LEFT_INP
-
-//пин точек D5
-#define DOT_BIT   5 // D5
-#define DOT_PORT  PORTD
-
-#define DOT_INV   (DOT_PORT ^= (1 << DOT_BIT))
-#define DOT_ON    (bitSet(DOT_PORT, DOT_BIT))
-#define DOT_OFF   (bitClear(DOT_PORT, DOT_BIT))
-#define DOT_OUT   (bitSet((DDR_REG(DOT_PORT)), DOT_BIT))
-
-#define DOT_INIT  DOT_OFF; DOT_OUT
-
-//пин колбы D9
-#define FLASK_BIT   1 // D9
-#define FLASK_PORT  PORTB
-
-#define is_FLASK_ON   (bitRead(FLASK_PORT, FLASK_BIT))
-#define FLASK_ON      (bitSet(FLASK_PORT, FLASK_BIT))
-#define FLASK_OFF     (bitClear(FLASK_PORT, FLASK_BIT))
-#define FLASK_OUT     (bitSet((DDR_REG(FLASK_PORT)), FLASK_BIT))
-
-#define FLASK_INIT  FLASK_OFF; FLASK_OUT
 
 int main(void)  //инициализация
 {
@@ -210,6 +165,26 @@ void ADC_disable(void) //выключение ADC
 void waint_pwr(void) //ожидание
 {
   SMCR = (0x0 << 1) | (1 << SE);  //устанавливаем режим сна idle
+
+  MCUCR = (0x03 << 5); //выкл bod
+  MCUCR = (0x02 << 5);
+
+  asm ("sleep");  //с этого момента спим.
+}
+//-------------------------------------Энергосбережение--------------------------------------------------------
+void save_pwr(void) //энергосбережение
+{
+  SMCR = (0x3 << 1) | (1 << SE);  //устанавливаем режим сна powersave
+
+  MCUCR = (0x03 << 5); //выкл bod
+  MCUCR = (0x02 << 5);
+
+  asm ("sleep");  //с этого момента спим.
+}
+//-------------------------------------Глубокий сон--------------------------------------------------------
+void sleep_pwr(void) //энергосбережение
+{
+  SMCR = (0x2 << 1) | (1 << SE);  //устанавливаем режим сна powerdown
 
   MCUCR = (0x03 << 5); //выкл bod
   MCUCR = (0x02 << 5);

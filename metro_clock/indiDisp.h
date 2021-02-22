@@ -1,8 +1,8 @@
 #include <Arduino.h>
 #include "font.c"
 
-const byte anodeMask[] = {14, 8, 7, 6, 4, 10, 3};   //порядок и номера пинов анодов индикатора(a, b, c, d, e, f, g)
-const byte cathodeMask[] = {16, 13, 12, 11};       //порядок и номера пинов катодов индикатора(0, 1, 2, 3)
+const byte anodeMask[] = {ANODE_A, ANODE_B, ANODE_C, ANODE_D, ANODE_E, ANODE_F, ANODE_G}; //порядок и номера пинов анодов индикатора(a, b, c, d, e, f, g)
+const byte cathodeMask[] = {CATHODE_1, CATHODE_2, CATHODE_3, CATHODE_4}; //порядок и номера пинов катодов индикатора(0, 1, 2, 3)
 
 uint8_t indi_buf[4];
 uint8_t indi_dimm[4];
