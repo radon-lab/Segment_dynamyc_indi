@@ -1,6 +1,7 @@
 #include "indiDisp.h"
 #include "DS1307.h"
-#include <avr/delay.h>
+#include <avr/sleep.h>
+#include <avr/power.h>
 
 #define BTN_GIST_TICK    2   //количество циклов для защиты от дребезга(0..255)(1 цикл -> +-17.5мс)
 #define BTN_HOLD_TICK    30  //количество циклов после которого считается что кнопка зажата(0..255)(1 цикл -> +-17.5мс)
@@ -116,11 +117,13 @@ int main(void)  //инициализация
 
     switch (check_keys()) {
       case 1: //left key press
-        if (++mode < 3) mode = 0;
+        if (++mode > 3) mode = 0;
+        scr = 0;
         break;
 
       case 2: //right key press
-        if (++mode < 3) mode = 0;
+        if (++mode > 3) mode = 0;
+        scr = 0;
         break;
 
       case 3: //left key hold
@@ -202,6 +205,16 @@ void ADC_disable(void) //выключение ADC
 {
   ADCSRA &= ~ (1 << ADEN); //выключаем ацп
   PRR |= (1 << 0); //выключаем питание ацп
+}
+//-------------------------------------Ожидание--------------------------------------------------------
+void waint_pwr(void) //ожидание
+{
+  SMCR = (0x0 << 1) | (1 << SE);  //устанавливаем режим сна idle
+
+  MCUCR = (0x03 << 5); //выкл bod
+  MCUCR = (0x02 << 5);
+
+  asm ("sleep");  //с этого момента спим.
 }
 //-----------------------------Проверка кнопок----------------------------------------------------
 uint8_t check_keys(void) //проверка кнопок
