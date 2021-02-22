@@ -83,44 +83,40 @@ int main(void)  //инициализация
   {
     data_convert(); //преобразование данных
 
-    uint8_t time[7];
-
-    switch (mode) {
-      case 0:
-        if (!scr) {
-          scr = 1;
+    if (!scr) {
+      scr = 1;
+      
+      uint8_t time[7];
+      switch (mode) {
+        case 0:
           TimeGetDate(time);
           indiPrintNum(time[4], 0, 2, '0'); //вывод чисел
           indiPrintNum(time[5], 2, 2, '0'); //вывод чисел
-        }
-        if (!timer_millis) {
-          DOT_INV;
-          timer_millis = 500;
-        }
-        break;
-      case 1:
-        if (!scr) {
-          scr = 1;
+          break;
+        case 1:
           TimeGetDate(time);
           indiPrintNum(time[1], 0, 2, '0'); //вывод чисел
           indiPrintNum(time[2], 2, 2, '0'); //вывод чисел
           DOT_ON;
-        }
-        break;
-      case 2:
-        if (!scr) {
-          scr = 1;
+          break;
+        case 2:
           uint16_t bat = _convert_vcc_bat(Read_VCC());
           indiPrintNum(bat / 100, 0, 1, '0'); //вывод чисел
           indiPrintNum(bat % 100, 1, 2, '0'); //вывод чисел
           indiPrint("V", 3);
           DOT_OFF;
-        }
-        break;
+          break;
+      }
+    }
+
+    if (!mode && !timer_millis) {
+      DOT_INV;
+      timer_millis = 500;
     }
 
     switch (check_keys()) {
       case 1: //left key press
+        if (++mode < 3) mode = 0;
         break;
 
       case 2: //right key press
@@ -131,7 +127,7 @@ int main(void)  //инициализация
         break;
 
       case 4: //right key hold
-        break; 
+        break;
     }
   }
   return 0; //конец
@@ -263,7 +259,7 @@ uint8_t check_keys(void) //проверка кнопок
     case 1:
       btn_set = 0; //сбрасываем признак нажатия
       switch (btn_switch) { //переключаемся в зависимости от состояния мультиопроса
-        case 1: return 1; //left press, возвращаем 5
+        case 1: return 1; //left press, возвращаем 1
         case 2: return 2; //right press, возвращаем 2
       }
       break;
@@ -271,8 +267,8 @@ uint8_t check_keys(void) //проверка кнопок
     case 2:
       btn_set = 0; //сбрасываем признак нажатия
       switch (btn_switch) { //переключаемся в зависимости от состояния мультиопроса
-        case 1: return 3; //left hold, возвращаем 6
-        case 2: return 4; //right hold, возвращаем 1
+        case 1: return 3; //left hold, возвращаем 3
+        case 2: return 4; //right hold, возвращаем 4
       }
       break;
   }
