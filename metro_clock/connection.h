@@ -62,3 +62,23 @@
 #define FLASK_OUT     (bitSet((DDR_REG(FLASK_PORT)), FLASK_BIT))
 
 #define FLASK_INIT  FLASK_OFF; FLASK_OUT
+
+//пин основного питания RTC A3
+#define RTC_BIT   3 // A3
+#define RTC_PORT  PORTC
+
+#define RTC_ON    (bitSet(RTC_PORT, RTC_BIT))
+#define RTC_OFF   (bitClear(RTC_PORT, RTC_BIT))
+#define RTC_OUT   (bitSet((DDR_REG(RTC_PORT)), RTC_BIT))
+
+#define RTC_INIT  RTC_ON; RTC_OUT
+
+//пин дополнительного питания RTC A1
+#define RTC_BAT_BIT   1 // A1
+#define RTC_BAT_PORT  PORTC
+
+#define RTC_BAT_ON    (bitSet(RTC_BAT_PORT, RTC_BAT_BIT))
+#define RTC_BAT_OFF   (bitClear(RTC_BAT_PORT, RTC_BAT_BIT))
+#define RTC_BAT_OUT   (bitSet((DDR_REG(RTC_BAT_PORT)), RTC_BAT_BIT))
+
+#define RTC_BAT_INIT  RTC_BAT_OFF; RTC_BAT_OUT

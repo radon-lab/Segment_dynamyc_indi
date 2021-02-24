@@ -8,44 +8,56 @@
 #define DS1307_ADDRESS 0x68
 
 void TimeGetDate(uint8_t *values);
-void TimeSetDate(uint8_t year, uint8_t month, uint8_t dayOfMonth, uint8_t dayOfWeek, uint8_t hour, uint8_t minue, uint8_t second);
+void TimeSetDate(const uint8_t *values);
 
-uint8_t fromDecimalToBCD(uint8_t decimalValue) 
+uint8_t fromDecimalToBCD(uint8_t decimalValue)
 {
   return ((decimalValue / 10) * 16) + (decimalValue % 10);
 }
 
-uint8_t fromBCDToDecimal(uint8_t BCDValue) 
+uint8_t fromBCDToDecimal(uint8_t BCDValue)
 {
   return ((BCDValue / 16) * 10) + (BCDValue % 16);
 }
 
-void TimeSetDate(uint8_t year, uint8_t month, uint8_t dayOfMonth, uint8_t dayOfWeek, uint8_t hour, uint8_t minute, uint8_t second) 
+void TimeSetDate(const uint8_t *values) // year, month, dayOfMonth, dayOfWeek, hour, minute, second
 {
+  RTC_ON;
+  RTC_BAT_OFF;
+  
   WireBeginTransmission(DS1307_ADDRESS);
-  WireWrite(0); //stop oscillator
+  WireWrite(0x00);
 
   //Start sending the new values
-  WireWrite(fromDecimalToBCD(second));
-  WireWrite(fromDecimalToBCD(minute));
-  WireWrite(fromDecimalToBCD(hour));
-  WireWrite(fromDecimalToBCD(dayOfWeek));
-  WireWrite(fromDecimalToBCD(dayOfMonth));
-  WireWrite(fromDecimalToBCD(month));
-  WireWrite(fromDecimalToBCD(year));
+  WireWrite(fromDecimalToBCD(values[6]));
+  WireWrite(fromDecimalToBCD(values[5]));
+  WireWrite(fromDecimalToBCD(values[4]));
+  WireWrite(fromDecimalToBCD(values[3]));
+  WireWrite(fromDecimalToBCD(values[2]));
+  WireWrite(fromDecimalToBCD(values[1]));
+  WireWrite(fromDecimalToBCD(values[0]));
 
-  WireWrite(0); //start oscillator
+  WireWrite(0x00);
   WireEndTransmission();
+
+  RTC_BAT_ON;
+  RTC_OFF;
 }
 
-void TimeGetDate(uint8_t *values) 
+void TimeGetDate(uint8_t *values) // year, month, dayOfMonth, dayOfWeek, hour, minute, second
 {
+  RTC_ON;
+  RTC_BAT_OFF;
+  
   WireBeginTransmission(DS1307_ADDRESS);
-  WireWrite(0); //stop oscillator
+  WireWrite(0x00);
   WireEndTransmission();
   WireRequestFrom(DS1307_ADDRESS, 7);
 
   for (int i = 6; i >= 0; i--) {
     values[i] = fromBCDToDecimal(WireRead());
   }
+
+  RTC_BAT_ON;
+  RTC_OFF;
 }

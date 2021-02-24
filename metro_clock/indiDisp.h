@@ -15,7 +15,7 @@ volatile uint8_t indi_state;
 #define fontbyte(x) pgm_read_byte(&indiFont[x])
 
 #define _INDI_ON  PRR &= ~(1 << 6); TIMSK2 = 0b00000011
-#define _INDI_OFF TCNT2 = TIMSK2 = 0b00000000; PRR |= (1 << 6); indi_state = 0
+#define _INDI_OFF TCNT2 = TIMSK2 = 0b00000000; PRR |= (1 << 6)
 
 void indiInit(void);
 void indiEnableSleep(void);
@@ -89,8 +89,10 @@ void indiInit(void) //инициализация индикаторов
 //---------------------------------Включение режима сна---------------------------------------
 void indiEnableSleep(void) //включение режима сна
 {
-  for (uint8_t i = 0; i < 4; i++) indi_buf[i] = 0; //очищаем буфер
   _INDI_OFF; //отключаем генирацию
+  for (uint8_t i = 0; i < 4; i++) indi_buf[i] = 0; //очищаем буфер
+  for (uint8_t i = 0; i < 7; i++) setPin(anodeMask[i], 0); //сбрасываем пины
+  for (uint8_t i = 0; i < 4; i++) setPin(cathodeMask[i], 1); //сбрасываем пины
 }
 //---------------------------------Выключение режима сна---------------------------------------
 void indiDisableSleep(uint8_t pwm) //выключение режима сна
