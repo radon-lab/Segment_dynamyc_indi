@@ -176,8 +176,9 @@ void sleepMode(void) //режим сна
   switch (tmr_sleep) {
     case 0:
       if (_sleep) {
-        _sleep = 0;
-        _mode = 0;
+        _sleep = 0; //сбрасываем флаг активного сна
+        _mode = 0; //переходим в режим часов
+        TWI_enable(); //включение TWI
         TimeGetDate(time); //синхронизируем время
         indiDisableSleep(255); //включаем дисплей
       }
@@ -185,8 +186,9 @@ void sleepMode(void) //режим сна
 
     case SLEEP_TIME:
       if (!_sleep) {
-        _sleep = 1;
-        DOT_OFF;
+        _sleep = 1; //устанавливаем флаг активного сна
+        DOT_OFF; //выключаем точки
+        TWI_disable(); //выключение TWI
         indiEnableSleep(); //выключаем дисплей
       }
       break;
