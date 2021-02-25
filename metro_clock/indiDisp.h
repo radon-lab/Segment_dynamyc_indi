@@ -21,6 +21,7 @@ void indiInit(void);
 void indiEnableSleep(void);
 void indiDisableSleep(uint8_t pwm = 255);
 void indiSetBright(uint8_t indi, uint8_t pwm);
+void indiSetBright(uint8_t pwm);
 void indiClr(void);
 void indiClr(uint8_t indi);
 void indiSet(uint8_t st, uint8_t indi, boolean state = 1);
@@ -106,6 +107,14 @@ void indiSetBright(uint8_t indi, uint8_t pwm) //установка яркост�
 {
   if (pwm < 20) pwm = 20;
   indi_dimm[indi] = pwm;
+}
+//---------------------------------Установка яркости индикаторов---------------------------------------
+void indiSetBright(uint8_t pwm) //установка яркости индикаторов
+{
+  if (pwm < 20) pwm = 20;
+  for (byte i = 0; i < 4; i++) {
+    indi_dimm[i] = pwm;
+  }
 }
 //-------------------------Очистка индикаторов----------------------------------------------------
 void indiClr(void) //очистка индикаторов

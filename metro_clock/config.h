@@ -10,4 +10,5 @@
 #define BAT_TIME 30 //время опроса заряда акб(5..120(с)
 
 const uint8_t timeDefault [] = { 21, 1, 1, 5, 8, 0, 0 };
+const uint8_t brightDefault [] = { 20, 80, 120, 180, 240 };
 const uint8_t daysInMonth [] PROGMEM = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }; //дней в месяце

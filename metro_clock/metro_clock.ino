@@ -23,6 +23,8 @@ uint8_t bat = 100; //заряд акб
 uint8_t tmr_sleep = 0; //счетчик ухода в сон
 boolean _sleep = 0; //влаг активного сна
 
+uint8_t timeBright[2] = { 23, 8 }; //массив времени 0 - ночь, 1 - день
+uint8_t indiBright[2] = { 0, 4 }; //массив подсветки 0 - ночь, 1 - день
 uint8_t time[7]; //массив времени(год, месяц, день, день_недели, часы, минуты, секунды)
 
 volatile boolean power_off = 0; //флаг отключения питания
@@ -64,6 +66,12 @@ int main(void)  //инициализация
   if (eeprom_read_byte((uint8_t*)100) != 100) { //если первый запуск, восстанавливаем из переменных
     eeprom_update_byte((uint8_t*)100, 100); //делаем метку
     eeprom_update_block((void*)&timeDefault, 0, sizeof(timeDefault)); //записываем дату по умолчанию в память
+    eeprom_update_block((void*)&timeBright, 7, sizeof(timeBright)); //записываем время в память
+    eeprom_update_block((void*)&indiBright, 9, sizeof(indiBright)); //записываем яркость в память
+  }
+  else {
+    eeprom_read_block((void*)&timeBright, 7, sizeof(timeBright)); //считываем время из памяти
+    eeprom_read_block((void*)&indiBright, 9, sizeof(indiBright)); //считываем яркость из памяти
   }
 
   TimeGetDate(time); //синхронизация времени
@@ -73,6 +81,8 @@ int main(void)  //инициализация
     TimeSetDate(time); //устанавливаем новое время
   }
   for (timer_millis = 2000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
+
+  indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
 
   //----------------------------------Главная-------------------------------------------------------------
   for (;;) //главная
@@ -89,7 +99,8 @@ ISR(INT0_vect) //внешнее прерывание на пине INT0 - вкл
   if (!RIGHT_OUT) { //если кнопка не отжата
     _batCheck(); //проверяем заряд акб
     if (bat > PWR_BAT_P) { //если батарея не разряжена
-      indiDisableSleep(255); //включаем дисплей
+      TimeGetDate(time); //синхронизируем время
+      indiDisableSleep(brightDefault[indiBright[changeBright()]]); //включаем дисплей
       indiPrint("####", 1); //отрисовка сообщения
 
       while (!RIGHT_OUT); //ждем пока отпустят кнопу
@@ -128,17 +139,19 @@ void data_convert(void) //преобразование данных
       case 1: if (btn_tmr > 0) btn_tmr--; break; //убираем дребезг
     }
 
-    //счет времени
     if (++wdt_time >= 57) {
       wdt_time = 0;
 
       if (!_sleep) {
-        if (++time[6] > 59) {
+        //счет времени
+        if (++time[6] > 59) { //секунды
           time[6] = 0;
-          if (++time[5] > 59) {
+          if (++time[5] > 59) { //минуты
             time[5] = 0;
-            if (++time[4] > 23)
+            if (++time[4] > 23) { //часы
               time[4] = 0;
+            }
+            indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
           }
           TimeGetDate(time); //синхронизируем время
         }
@@ -155,7 +168,7 @@ void data_convert(void) //преобразование данных
           _PowerDown(); //выключаем питание
         }
       }
-      else tmr_bat++;
+      else tmr_bat++; //иначе прибавляем время
       //сон
       if (!disableSleep && tmr_sleep <= 5) tmr_sleep++; //таймер ухода в сон
     }
@@ -171,7 +184,7 @@ void data_convert(void) //преобразование данных
 void sleepMode(void) //режим сна
 {
   if (!_sleep) save_pwr(); //энергосбережение
-  else sleep_pwr(); //иначе
+  else sleep_pwr(); //иначе сон
 
   switch (tmr_sleep) {
     case 0:
@@ -180,7 +193,7 @@ void sleepMode(void) //режим сна
         _mode = 0; //переходим в режим часов
         TWI_enable(); //включение TWI
         TimeGetDate(time); //синхронизируем время
-        indiDisableSleep(255); //включаем дисплей
+        indiDisableSleep(brightDefault[indiBright[changeBright()]]); //включаем дисплей
       }
       break;
 
@@ -292,7 +305,7 @@ void _PowerDown(void)
 //----------------------------------------------------------------------------------
 void _batCheck(void)
 {
-  uint16_t vcc = (1.10 * 255.0) / Read_VCC() * 100;
+  uint16_t vcc = (1.10 * 255.0) / Read_VCC() * 100; //рассчитываем напряжение
   bat = map(constrain(vcc, BAT_MIN_V, BAT_MAX_V), BAT_MIN_V, BAT_MAX_V, 0, 100); //состояние батареи
 }
 //-----------------------------Проверка кнопок----------------------------------------------------
@@ -367,13 +380,13 @@ uint8_t check_keys(void) //проверка кнопок
 //----------------------------------------------------------------------------------
 void settings_time(void)
 {
-  uint8_t cur_mode = 0;
-  boolean blink_data = 0;
+  uint8_t cur_mode = 0; //текущий режим
+  boolean blink_data = 0; //мигание сигментами
 
   disableSleep = 1; //запрещаем сон
 
   DOT_ON; //включаем точку
-  indiClr();
+  indiClr(); //очищаем индикаторы
   indiPrint("SET", 0);
   for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
 
@@ -387,20 +400,20 @@ void settings_time(void)
       switch (cur_mode) {
         case 0:
         case 1:
-          if (!blink_data || cur_mode == 1) indiPrintNum(time[4], 0, 2, '0'); //вывод чисел
-          if (!blink_data || cur_mode == 0) indiPrintNum(time[5], 2, 2, '0'); //вывод чисел
+          if (!blink_data || cur_mode == 1) indiPrintNum(time[4], 0, 2, '0'); //вывод часов
+          if (!blink_data || cur_mode == 0) indiPrintNum(time[5], 2, 2, '0'); //вывод минут
           break;
         case 2:
         case 3:
-          if (!blink_data || cur_mode == 3) indiPrintNum(time[1], 0, 2, '0'); //вывод чисел
-          if (!blink_data || cur_mode == 2) indiPrintNum(time[2], 2, 2, '0'); //вывод чисел
+          if (!blink_data || cur_mode == 3) indiPrintNum(time[1], 0, 2, '0'); //вывод месяца
+          if (!blink_data || cur_mode == 2) indiPrintNum(time[2], 2, 2, '0'); //вывод даты
           break;
         case 4:
-          indiPrint("20", 0); //вывод чисел
-          if (!blink_data) indiPrintNum(time[0], 2, 2, '0'); //вывод чисел
+          indiPrint("20", 0); //вывод 2000
+          if (!blink_data) indiPrintNum(time[0], 2, 2, '0'); //вывод года
           break;
       }
-      blink_data = !blink_data;
+      blink_data = !blink_data; //мигание сигментами
     }
 
     //+++++++++++++++++++++  опрос кнопок  +++++++++++++++++++++++++++
@@ -469,9 +482,137 @@ void settings_time(void)
         indiPrint("OUT", 0);
         for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
         disableSleep = 0; //разрешаем сон
+        _mode = 0; //переходим в режим часов
         scr = 0; //обновляем экран
         return;
     }
+  }
+}
+//----------------------------------------------------------------------------------
+void settings_bright(void)
+{
+  uint8_t cur_mode = 0; //текущий режим
+  boolean blink_data = 0; //мигание сигментами
+
+  disableSleep = 1; //запрещаем сон
+
+  DOT_OFF; //включаем точку
+  indiClr(); //очищаем индикаторы
+  indiPrint("BRI", 0);
+  for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
+  indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+
+  //настройки
+  while (1) {
+    data_convert(); //преобразование данных
+
+    if (!scr) {
+      scr = 1; //сбрасываем флаг
+      indiClr(); //очистка индикаторов
+      switch (cur_mode) {
+        case 0:
+          indiPrint("N", 0);
+          if (!blink_data) indiPrintNum(timeBright[0], 2, 2, '0'); //вывод время включения ночной подсветки
+          break;
+        case 1:
+          indiPrint("BR", 0); //вывод 2000
+          if (!blink_data) indiPrintNum(indiBright[0] + 1, 3); //вывод яркости
+          break;
+        case 2:
+          indiPrint("D", 0);
+          if (!blink_data) indiPrintNum(timeBright[1], 2, 2, '0'); //вывод время включения дневной подсветки
+          break;
+        case 3:
+          indiPrint("BR", 0); //вывод 2000
+          if (!blink_data) indiPrintNum(indiBright[1] + 1, 3); //вывод яркости
+          break;
+      }
+      blink_data = !blink_data; //мигание сигментами
+    }
+
+    //+++++++++++++++++++++  опрос кнопок  +++++++++++++++++++++++++++
+    switch (check_keys()) {
+      case 1: //left click
+        switch (cur_mode) {
+          //настройка ночной подсветки
+          case 0: if (timeBright[0] > 0) timeBright[0]--; else timeBright[0] = 23; break; //часы
+          case 1:
+            if (indiBright[0] > 0) indiBright[0]--; else indiBright[0] = 4;
+            indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+            break;
+
+          //настройка дневной подсветки
+          case 2: if (timeBright[1] > 0) timeBright[1]--; else timeBright[1] = 23; break; //часы
+          case 3:
+            if (indiBright[1] > 0) indiBright[1]--; else indiBright[1] = 4;
+            indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
+            break;
+        }
+        scr = blink_data = 0; //сбрасываем флаги
+        break;
+
+      case 2: //right click
+        switch (cur_mode) {
+          //настройка ночной подсветки
+          case 0: if (timeBright[0] < 23) timeBright[0]++; else timeBright[0] = 0; break; //часы
+          case 1:
+            if (indiBright[0] < 4) indiBright[0]++; else indiBright[0] = 0;
+            indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+            break;
+
+          //настройка дневной подсветки
+          case 2: if (timeBright[1] < 23) timeBright[1]++; else timeBright[1] = 0; break; //часы
+          case 3:
+            if (indiBright[1] < 4) indiBright[1]--; else indiBright[1] = 0;
+            indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
+            break;
+        }
+        scr = blink_data = 0; //сбрасываем флаги
+        break;
+
+      case 3: //left hold
+        if (cur_mode < 3) cur_mode++; else cur_mode = 0;
+        switch (cur_mode) {
+          case 0:
+            indiClr(); //очистка индикаторов
+            indiPrint("N", 0);
+            for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
+            indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+            break;
+
+          case 2:
+            indiClr(); //очистка индикаторов
+            indiPrint("D", 0);
+            for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
+            indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
+            break;
+        }
+        scr = blink_data = 0; //сбрасываем флаги
+        break;
+
+      case 4: //right hold
+        eeprom_update_block((void*)&timeBright, 7, sizeof(timeBright)); //записываем время в память
+        eeprom_update_block((void*)&indiBright, 9, sizeof(indiBright)); //записываем яркость в память
+        DOT_OFF; //выключаем точку
+        indiClr(); //очистка индикаторов
+        indiPrint("OUT", 0);
+        for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
+        indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
+        disableSleep = 0; //разрешаем сон
+        _mode = 0; //переходим в режим часов
+        scr = 0; //обновляем экран
+        return;
+    }
+  }
+}
+//----------------------------------------------------------------------------------
+boolean changeBright(void) {
+  // установка яркости всех светилок от времени суток
+  if ((timeBright[0] > timeBright[1] && (time[4] >= timeBright[0] || time[4] < timeBright[1])) ||
+      (timeBright[0] < timeBright[1] && time[4] >= timeBright[0] && time[4] < timeBright[1])) {
+    return 0;
+  } else {
+    return 1;
   }
 }
 //-----------------------------Главный экран------------------------------------------------
@@ -481,18 +622,18 @@ void main_screen(void) //главный экран
     scr = 1; //сбрасываем флаг
     switch (_mode) {
       case 0:
-        indiPrintNum(time[4], 0, 2, '0'); //вывод чисел
-        indiPrintNum(time[5], 2, 2, '0'); //вывод чисел
+        indiPrintNum(time[4], 0, 2, '0'); //вывод часов
+        indiPrintNum(time[5], 2, 2, '0'); //вывод минут
         break;
       case 1:
-        indiPrintNum(time[1], 0, 2, '0'); //вывод чисел
-        indiPrintNum(time[2], 2, 2, '0'); //вывод чисел
-        DOT_ON;
+        indiPrintNum(time[1], 0, 2, '0'); //вывод месяца
+        indiPrintNum(time[2], 2, 2, '0'); //вывод даты
+        DOT_ON; //включаем точки
         break;
       case 2:
         indiPrint("B", 0);
-        indiPrintNum(bat, 1, 3, ' '); //вывод чисел
-        DOT_OFF;
+        indiPrintNum(bat, 1, 3, ' '); //вывод заряда акб
+        DOT_OFF; //выключаем точки
         break;
     }
   }
@@ -504,14 +645,12 @@ void main_screen(void) //главный экран
 
   switch (check_keys()) {
     case 1: //left key press
-      if (_mode > 0) _mode--;
-      else _mode = 2;
+      _mode = (!_mode) ? 2 : 0;
       scr = 0;
       break;
 
     case 2: //right key press
-      if (_mode < 3) _mode++;
-      else _mode = 0;
+      _mode = (!_mode) ? 1 : 0;
       scr = 0;
       break;
 
@@ -520,6 +659,7 @@ void main_screen(void) //главный экран
       break;
 
     case 4: //right key hold
+      settings_bright();
       break;
   }
 }
