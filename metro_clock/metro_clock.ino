@@ -32,6 +32,9 @@ volatile uint8_t tick_wdt; //счетчик тиков для обработки
 uint32_t timer_millis; //таймер отсчета миллисекунд
 uint32_t timer_dot; //таймер отсчета миллисекунд для точек
 
+//#define DOT_START PRR &= ~(1 << 5); TIMSK0 = 0b00000001
+//#define DOT_STOP TIMSK0 = 0b00000000; PRR |= (1 << 5)
+
 int atexit(void (* /*func*/ )()) { //инициализация функций
   return 0;
 }
