@@ -183,8 +183,8 @@ void data_convert(void) //преобразование данных
 //-------------------------------Режим сна----------------------------------------------------
 void sleepMode(void) //режим сна
 {
-  if (!_sleep) save_pwr(); //энергосбережение
-  else sleep_pwr(); //иначе сон
+  //if (!_sleep) save_pwr(); //энергосбережение
+  //else sleep_pwr(); //иначе сон
 
   switch (tmr_sleep) {
     case 0:
