@@ -23,8 +23,8 @@ uint8_t bat = 100; //заряд акб
 uint8_t tmr_sleep = 0; //счетчик ухода в сон
 boolean _sleep = 0; //влаг активного сна
 
-uint8_t timeBright[2] = { 23, 8 }; //массив времени 0 - ночь, 1 - день
-uint8_t indiBright[2] = { 0, 4 }; //массив подсветки 0 - ночь, 1 - день
+uint8_t timeBright[] = { 23, 8 }; //массив времени 0 - ночь, 1 - день
+uint8_t indiBright[] = { 0, 4 }; //массив подсветки 0 - ночь, 1 - день
 uint8_t time[7]; //массив времени(год, месяц, день, день_недели, часы, минуты, секунды)
 
 volatile boolean power_off = 0; //флаг отключения питания
@@ -183,8 +183,8 @@ void data_convert(void) //преобразование данных
 //-------------------------------Режим сна----------------------------------------------------
 void sleepMode(void) //режим сна
 {
-  //if (!_sleep) save_pwr(); //энергосбережение
-  //else sleep_pwr(); //иначе сон
+  if (!_sleep) save_pwr(); //энергосбережение
+  else sleep_pwr(); //иначе сон
 
   switch (tmr_sleep) {
     case 0:
@@ -220,7 +220,7 @@ void waint_pwr(void) //ожидание
 //-------------------------------------Энергосбережение--------------------------------------------------------
 void save_pwr(void) //энергосбережение
 {
-  SMCR = (0x3 << 1) | (1 << SE);  //устанавливаем режим сна powersave
+  SMCR = (0x7 << 1) | (1 << SE);  //устанавливаем режим сна extstandby
 
   MCUCR = (0x03 << 5); //выкл bod
   MCUCR = (0x02 << 5);
@@ -476,6 +476,7 @@ void settings_time(void)
 
       case 4: //right hold
         eeprom_update_block((void*)&time, 0, sizeof(time)); //записываем дату в память
+        indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
         TimeSetDate(time); //обновляем время
         DOT_OFF; //выключаем точку
         indiClr(); //очистка индикаторов
@@ -563,7 +564,7 @@ void settings_bright(void)
           //настройка дневной подсветки
           case 2: if (timeBright[1] < 23) timeBright[1]++; else timeBright[1] = 0; break; //часы
           case 3:
-            if (indiBright[1] < 4) indiBright[1]--; else indiBright[1] = 0;
+            if (indiBright[1] < 4) indiBright[1]++; else indiBright[1] = 0;
             indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
             break;
         }
@@ -593,11 +594,11 @@ void settings_bright(void)
       case 4: //right hold
         eeprom_update_block((void*)&timeBright, 7, sizeof(timeBright)); //записываем время в память
         eeprom_update_block((void*)&indiBright, 9, sizeof(indiBright)); //записываем яркость в память
+        indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
         DOT_OFF; //выключаем точку
         indiClr(); //очистка индикаторов
         indiPrint("OUT", 0);
         for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
-        indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
         disableSleep = 0; //разрешаем сон
         _mode = 0; //переходим в режим часов
         scr = 0; //обновляем экран
