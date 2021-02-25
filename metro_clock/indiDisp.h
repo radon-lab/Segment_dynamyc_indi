@@ -6,7 +6,9 @@ const byte cathodeMask[] = {CATHODE_1, CATHODE_2, CATHODE_3, CATHODE_4}; //по�
 
 uint8_t indi_buf[4];
 uint8_t indi_dimm[4];
+uint8_t flash_dimm[2];
 boolean dot_state;
+boolean flask_state;
 volatile uint8_t indi_state;
 
 #define LEFT 0
@@ -15,13 +17,14 @@ volatile uint8_t indi_state;
 
 #define fontbyte(x) pgm_read_byte(&indiFont[x])
 
-#define _INDI_ON  PRR &= ~(1 << 6); TIMSK2 = 0b00000011
+#define _INDI_ON  PRR &= ~(1 << 6); TIMSK2 = 0b00000111
 #define _INDI_OFF TCNT2 = TIMSK2 = 0b00000000; PRR |= (1 << 6)
 
 void indiInit(void);
 void indiEnableSleep(void);
 void indiDisableSleep(uint8_t pwm = 255);
 void indiSetBright(uint8_t indi, uint8_t pwm);
+void flashSetBright(uint8_t flash, uint8_t pwm);
 void indiSetBright(uint8_t pwm);
 void indiClr(void);
 void indiClr(uint8_t indi);
@@ -54,12 +57,25 @@ ISR(TIMER2_OVF_vect) //генерация символов
   }
   OCR2A = indi_dimm[indi_state];
   setPin(cathodeMask[indi_state], 0);
-  if (dot_state) DOT_ON; //включаем точки
+
+  switch (indi_state) {
+    case 0:
+      OCR2B = flash_dimm[0];
+      if (dot_state) DOT_ON; //включаем точки
+      break;
+    case 2:
+      OCR2B = flash_dimm[1];
+      if (flask_state) FLASK_ON; //включаем колбу
+      break;
+  }
 }
 ISR(TIMER2_COMPA_vect) {
-  DOT_OFF; //выключаем точки
   setPin(cathodeMask[indi_state], 1);
   if (++indi_state > 3) indi_state = 0;
+}
+ISR(TIMER2_COMPB_vect) {
+  DOT_OFF; //выключаем точки
+  FLASK_OFF; //выключаем колбу
 }
 //-------------------------Инициализация индикаторов----------------------------------------------------
 void indiInit(void) //инициализация индикаторов
@@ -76,7 +92,8 @@ void indiInit(void) //инициализация индикаторов
     indi_dimm[i] = 255;
   }
 
-  OCR2A = indi_dimm[indi_state];
+  OCR2A = indi_dimm[0];
+  OCR2B = flash_dimm[0];
 
   TCCR2A = 0b00000000; //отключаем OC2A/OC2B
 #if F_CPU == 16000000UL
@@ -98,6 +115,7 @@ void indiEnableSleep(void) //включение режима сна
   for (uint8_t i = 0; i < 7; i++) setPin(anodeMask[i], 0); //сбрасываем пины
   for (uint8_t i = 0; i < 4; i++) setPin(cathodeMask[i], 1); //сбрасываем пины
   DOT_OFF; //выключаем точки
+  FLASK_OFF; //выключаем колбу
 }
 //---------------------------------Выключение режима сна---------------------------------------
 void indiDisableSleep(uint8_t pwm) //выключение режима сна
@@ -112,12 +130,21 @@ void indiSetBright(uint8_t indi, uint8_t pwm) //установка яркост�
   if (pwm < 30) pwm = 30;
   indi_dimm[indi] = pwm;
 }
-//---------------------------------Установка яркости индикаторов---------------------------------------
-void indiSetBright(uint8_t pwm) //установка яркости индикаторов
+//---------------------------------Установка яркости светодиодов---------------------------------------
+void flashSetBright(uint8_t flash, uint8_t pwm) //установка яркости светодиодов
+{
+  if (pwm < 30) pwm = 30;
+  flash_dimm[flash] = pwm;
+}
+//---------------------------------Установка общей яркости---------------------------------------
+void indiSetBright(uint8_t pwm) //установка общей яркости
 {
   if (pwm < 30) pwm = 30;
   for (byte i = 0; i < 4; i++) {
     indi_dimm[i] = pwm;
+  }
+  for (byte i = 0; i < 2; i++) {
+    flash_dimm[i] = pwm;
   }
 }
 //-------------------------Очистка индикаторов----------------------------------------------------
