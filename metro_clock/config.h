@@ -9,6 +9,6 @@
 #define SLEEP_TIME 5 //время ухода в сон(3..60)(с)
 #define BAT_TIME 30 //время опроса заряда акб(5..120(с)
 
-const uint8_t timeDefault [] = { 21, 1, 1, 5, 8, 0, 0 };
-const uint8_t brightDefault [] = { 50, 80, 120, 180, 250 };
+const uint8_t timeDefault [] = { 21, 1, 1, 5, 8, 0, 0 }; //время по умолчанию при потере питания
+const uint8_t brightDefault [] = { 50, 80, 120, 180, 250 }; //пресеты яркости(30..255)(не более 5 пресетов)
 const uint8_t daysInMonth [] PROGMEM = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }; //дней в месяце

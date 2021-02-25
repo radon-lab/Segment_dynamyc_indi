@@ -203,7 +203,6 @@ void sleepMode(void) //режим сна
     case SLEEP_TIME:
       if (!_sleep) {
         _sleep = 1; //устанавливаем флаг активного сна
-        dot_state = 0; //выключаем точки
         TWI_disable(); //выключение TWI
         indiEnableSleep(); //выключаем дисплей
       }

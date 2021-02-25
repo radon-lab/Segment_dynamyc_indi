@@ -97,6 +97,7 @@ void indiEnableSleep(void) //включение режима сна
   for (uint8_t i = 0; i < 4; i++) indi_buf[i] = 0; //очищаем буфер
   for (uint8_t i = 0; i < 7; i++) setPin(anodeMask[i], 0); //сбрасываем пины
   for (uint8_t i = 0; i < 4; i++) setPin(cathodeMask[i], 1); //сбрасываем пины
+  DOT_OFF; //выключаем точки
 }
 //---------------------------------Выключение режима сна---------------------------------------
 void indiDisableSleep(uint8_t pwm) //выключение режима сна
