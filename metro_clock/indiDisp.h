@@ -18,7 +18,7 @@ volatile uint8_t indi_state;
 #define fontbyte(x) pgm_read_byte(&indiFont[x])
 
 #define _INDI_ON  PRR &= ~(1 << 6); TIMSK2 = 0b00000111
-#define _INDI_OFF TCNT2 = TIMSK2 = 0b00000000; PRR |= (1 << 6)
+#define _INDI_OFF TCNT2 = 126; TIMSK2 = 0b00000000; PRR |= (1 << 6)
 
 void indiInit(void);
 void indiEnableSleep(void);
@@ -48,8 +48,9 @@ void outPin(uint8_t pin) {
 //---------------------------------Генерация символов---------------------------------------
 ISR(TIMER2_OVF_vect) //генерация символов
 {
-  uint8_t data = indi_buf[indi_state];
+  TCNT2 = 126;
 
+  uint8_t data = indi_buf[indi_state];
   for (uint8_t c = 0; c < 7; c++)
   {
     setPin(anodeMask[c], data & 0x80);
@@ -92,6 +93,10 @@ void indiInit(void) //инициализация индикаторов
     indi_dimm[i] = 255;
   }
 
+  for (byte i = 0; i < 2; i++) {
+    flash_dimm[i] = 255;
+  }
+
   OCR2A = indi_dimm[0];
   OCR2B = flash_dimm[0];
 
@@ -120,31 +125,31 @@ void indiEnableSleep(void) //включение режима сна
 //---------------------------------Выключение режима сна---------------------------------------
 void indiDisableSleep(uint8_t pwm) //выключение режима сна
 {
-  if (pwm < 30) pwm = 30;
-  for (uint8_t i = 0; i < 4; i++) indi_dimm[i] = pwm; //устанавливаем максимальную яркость
+  if (!pwm) pwm = 1;
+  for (uint8_t i = 0; i < 4; i++) indi_dimm[i] = 128 + pwm; //устанавливаем максимальную яркость
   _INDI_ON; //запускаем генерацию
 }
 //---------------------------------Установка яркости индикатора---------------------------------------
 void indiSetBright(uint8_t indi, uint8_t pwm) //установка яркости индикатора
 {
-  if (pwm < 30) pwm = 30;
-  indi_dimm[indi] = pwm;
+  if (!pwm) pwm = 1;
+  indi_dimm[indi] = 128 + pwm;
 }
 //---------------------------------Установка яркости светодиодов---------------------------------------
 void flashSetBright(uint8_t flash, uint8_t pwm) //установка яркости светодиодов
 {
-  if (pwm < 30) pwm = 30;
-  flash_dimm[flash] = pwm;
+  if (!pwm) pwm = 1;
+  flash_dimm[flash] = 128 + pwm;
 }
 //---------------------------------Установка общей яркости---------------------------------------
 void indiSetBright(uint8_t pwm) //установка общей яркости
 {
-  if (pwm < 30) pwm = 30;
+  if (!pwm) pwm = 1;
   for (byte i = 0; i < 4; i++) {
-    indi_dimm[i] = pwm;
+    indi_dimm[i] = 128 + pwm;
   }
   for (byte i = 0; i < 2; i++) {
-    flash_dimm[i] = pwm;
+    flash_dimm[i] = 128 + pwm;
   }
 }
 //-------------------------Очистка индикаторов----------------------------------------------------
