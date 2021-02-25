@@ -6,6 +6,7 @@ const byte cathodeMask[] = {CATHODE_1, CATHODE_2, CATHODE_3, CATHODE_4}; //по�
 
 uint8_t indi_buf[4];
 uint8_t indi_dimm[4];
+boolean dot_state;
 volatile uint8_t indi_state;
 
 #define LEFT 0
@@ -53,8 +54,10 @@ ISR(TIMER2_OVF_vect) //генерация символов
   }
   OCR2A = indi_dimm[indi_state];
   setPin(cathodeMask[indi_state], 0);
+  if (dot_state) DOT_ON; //включаем точки
 }
 ISR(TIMER2_COMPA_vect) {
+  DOT_OFF; //выключаем точки
   setPin(cathodeMask[indi_state], 1);
   if (++indi_state > 3) indi_state = 0;
 }
@@ -77,11 +80,9 @@ void indiInit(void) //инициализация индикаторов
 
   TCCR2A = 0b00000000; //отключаем OC2A/OC2B
 #if F_CPU == 16000000UL
-  TCCR2B = 0b00000011; //пределитель 32
+  TCCR2B = 0b00000100; //пределитель 64
 #elif F_CPU == 8000000UL
-  CLKPR = (1 << CLKPCE); //разрешили менять делитель
-  CLKPR = 0b00000001; //установили пределитель 2
-  TCCR2B = 0b00000010; //пределитель 8
+  TCCR2B = 0b00000011; //пределитель 32
 #endif
   TIMSK2 = 0b00000000; //отключаем прерывания Таймера2
 

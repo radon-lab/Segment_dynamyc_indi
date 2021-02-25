@@ -167,7 +167,7 @@ void data_convert(void) //преобразование данных
         if (bat < LOW_BAT_P) { //если батарея разряжена
           indiPrint("LO", 1); //отрисовка сообщения разряженной батареи
           _delay_ms(2000); //ждём
-          DOT_OFF; //выключаем точку
+          dot_state = 0; //выключаем точку
           _PowerDown(); //выключаем питание
         }
       }
@@ -203,7 +203,7 @@ void sleepMode(void) //режим сна
     case SLEEP_TIME:
       if (!_sleep) {
         _sleep = 1; //устанавливаем флаг активного сна
-        DOT_OFF; //выключаем точки
+        dot_state = 0; //выключаем точки
         TWI_disable(); //выключение TWI
         indiEnableSleep(); //выключаем дисплей
       }
@@ -388,7 +388,7 @@ void settings_time(void)
 
   disableSleep = 1; //запрещаем сон
 
-  DOT_ON; //включаем точку
+  dot_state = 1; //включаем точку
   indiClr(); //очищаем индикаторы
   indiPrint("SET", 0);
   for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
@@ -481,7 +481,7 @@ void settings_time(void)
         eeprom_update_block((void*)&time, 0, sizeof(time)); //записываем дату в память
         indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
         TimeSetDate(time); //обновляем время
-        DOT_OFF; //выключаем точку
+        dot_state = 0; //выключаем точку
         indiClr(); //очистка индикаторов
         indiPrint("OUT", 0);
         for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
@@ -500,7 +500,7 @@ void settings_bright(void)
 
   disableSleep = 1; //запрещаем сон
 
-  DOT_OFF; //включаем точку
+  dot_state = 0; //включаем точку
   indiClr(); //очищаем индикаторы
   indiPrint("BRI", 0);
   for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
@@ -598,7 +598,7 @@ void settings_bright(void)
         eeprom_update_block((void*)&timeBright, 7, sizeof(timeBright)); //записываем время в память
         eeprom_update_block((void*)&indiBright, 9, sizeof(indiBright)); //записываем яркость в память
         indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
-        DOT_OFF; //выключаем точку
+        dot_state = 0; //выключаем точку
         indiClr(); //очистка индикаторов
         indiPrint("OUT", 0);
         for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
@@ -632,18 +632,18 @@ void main_screen(void) //главный экран
       case 1:
         indiPrintNum(time[1], 0, 2, '0'); //вывод месяца
         indiPrintNum(time[2], 2, 2, '0'); //вывод даты
-        DOT_ON; //включаем точки
+        dot_state = 1; //включаем точки
         break;
       case 2:
         indiPrint("B", 0);
         indiPrintNum(bat, 1, 3, ' '); //вывод заряда акб
-        DOT_OFF; //выключаем точки
+        dot_state = 0; //выключаем точки
         break;
     }
   }
 
   if (!_sleep && !_mode && !timer_dot) {
-    DOT_INV; //инвертируем точки
+    dot_state = !dot_state; //инвертируем точки
     timer_dot = 500;
   }
 
