@@ -550,6 +550,7 @@ void settings_bright(void)
 {
   uint8_t cur_mode = 0; //текущий режим
   boolean blink_data = 0; //мигание сигментами
+  const uint8_t allModes[] = {2, 3, 5}; //всего режимов
 
   disableSleep = 1; //запрещаем сон
 
@@ -741,11 +742,7 @@ void settings_bright(void)
         break;
 
       case 3: //left hold
-        switch (_bright_mode) {
-          case 0: if (cur_mode < 2) cur_mode++; else cur_mode = 0; break;
-          case 1: if (cur_mode < 3) cur_mode++; else cur_mode = 0; break;
-          case 2: if (cur_mode < 5) cur_mode++; else cur_mode = 0; break;
-        }
+        if (cur_mode < allModes[_bright_mode]) cur_mode++; else cur_mode = 0;
         switch (cur_mode) {
           case 0:
             indiClr(); //очистка индикаторов
