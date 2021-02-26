@@ -742,7 +742,8 @@ void settings_bright(void)
         break;
 
       case 3: //left hold
-        if (cur_mode < allModes[_bright_mode]) cur_mode++; else cur_mode = 0;
+        //if (cur_mode < allModes[_bright_mode]) cur_mode++; else cur_mode = 0;
+        if (cur_mode < 3) cur_mode++; else cur_mode = 0;
         switch (cur_mode) {
           case 0:
             indiClr(); //очистка индикаторов
