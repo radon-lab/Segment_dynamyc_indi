@@ -24,6 +24,8 @@ uint8_t _bright_levle = 0; //текущая яркость подсветки
 uint8_t timeBright[] = { 23, 8 }; //массив времени 0 - ночь, 1 - день
 uint8_t indiBright[] = { 0, 4 }; //массив подсветки 0 - ночь, 1 - день
 
+const uint8_t allModes[3] = {2, 3, 5}; //всего режимов
+
 boolean scr = 0; //флаг обновления экрана
 boolean disableSleep = 0; //флаг запрета сна
 
@@ -550,7 +552,6 @@ void settings_bright(void)
 {
   uint8_t cur_mode = 0; //текущий режим
   boolean blink_data = 0; //мигание сигментами
-  const uint8_t allModes[] = {2, 3, 5}; //всего режимов
 
   disableSleep = 1; //запрещаем сон
 
@@ -742,8 +743,7 @@ void settings_bright(void)
         break;
 
       case 3: //left hold
-        //if (cur_mode < allModes[_bright_mode]) cur_mode++; else cur_mode = 0;
-        if (cur_mode < 3) cur_mode++; else cur_mode = 0;
+        if (cur_mode < allModes[_bright_mode]) cur_mode++; else cur_mode = 0;
         switch (cur_mode) {
           case 0:
             indiClr(); //очистка индикаторов
