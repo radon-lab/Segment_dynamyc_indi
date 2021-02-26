@@ -569,7 +569,7 @@ void settings_bright(void)
       switch (cur_mode) {
         case 0:
           indiPrint("FL", 0); //вывод 2000
-          if (!blink_data) indiPrintNum(indiBright[0], 3); //режим колбы
+          if (!blink_data) indiPrintNum(_flask_mode, 3); //режим колбы
           break;
         case 1:
           indiPrint("BR", 0);
