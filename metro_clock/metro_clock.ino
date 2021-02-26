@@ -17,8 +17,8 @@ boolean btn_state; //флаг текущего состояния кнопки
 
 uint8_t _mode = 0; //текущий основной режим
 uint8_t _timer_mode = 0; //текущий режим таймера(0-выкл | 1-настройка | 2-вкл | 3-пауза)
-uint8_t _timer_preset = 0;
-uint16_t _timer_secs = 0; //установленное время таймера
+uint8_t _timer_preset = 0; //текущий номер выбранного пресета таймера
+uint16_t _timer_secs = timerDefault[_timer_preset] * 60; //установленное время таймера
 
 uint8_t _flask_mode = 2; //текущий режим свечения колбы
 uint8_t _bright_mode = 0; //текущий режим подсветки
@@ -215,6 +215,8 @@ void data_convert(void) //преобразование данных
               timer_dot = 500;
             }
           }
+          _mode = 0; //переходим в режим часов
+          _timer_mode = 0; //сбрасываем режим таймера
           disableSleep = 0; //разрешаем сон
         }
       }
@@ -867,15 +869,15 @@ void main_screen(void) //главный экран
       case 2:
         if (!_timer_mode) {
           indiPrint("T", 0);
-          indiPrintNum(timerDefault[_timer_preset], 2); //вывод времени таймера
+          indiPrintNum(timerDefault[_timer_preset], 2, 2, '0'); //вывод времени таймера
         }
         else {
           indiPrintNum(_timer_secs / 60, 0, 2, '0'); //вывод минут
-          indiPrintNum(_timer_secs & 60, 2, 2, '0'); //вывод секунд
+          indiPrintNum(_timer_secs % 60, 2, 2, '0'); //вывод секунд
         }
         switch (_timer_mode) {
-          case 0: dot_state = 1; break; //включаем точки
-          case 1: dot_state = 0; break; //выключаем точки
+          case 0: dot_state = 0; break; //включаем точки
+          case 1: dot_state = 1; break; //выключаем точки
         }
         break;
       case 3:
