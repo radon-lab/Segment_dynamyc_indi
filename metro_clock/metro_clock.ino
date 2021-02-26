@@ -16,8 +16,11 @@ boolean btn_check; //флаг разрешения опроса кнопки
 boolean btn_state; //флаг текущего состояния кнопки
 
 uint8_t _mode = 0; //текущий основной режим
-uint8_t _flask_mode = 2; //текущий режим свечения колбы
+uint8_t _timer_mode = 0; //текущий режим таймера(0-выкл | 1-настройка | 2-вкл | 3-пауза)
+uint8_t _timer_preset = 0;
+uint16_t _timer_secs = 0; //установленное время таймера
 
+uint8_t _flask_mode = 2; //текущий режим свечения колбы
 uint8_t _bright_mode = 0; //текущий режим подсветки
 uint8_t _bright_levle = 0; //текущая яркость подсветки
 
@@ -193,6 +196,28 @@ void data_convert(void) //преобразование данных
         if (!disableSleep && _bright_mode == 1) indiSetBright(brightDefault[indiBright[readLightSens()]]); //установка яркости индикаторов
         scr = 0;
       }
+      //таймер часов
+      if (_timer_mode == 2 && _timer_secs) {
+        _timer_secs--;
+        //оповещение окончания таймера
+        if (!_timer_secs) {
+          tmr_sleep = 0; //сбрасываем таймер сна
+          disableSleep = 1; //запрещаем сон
+          sleepOut(); //выход из сна
+          for (timer_millis = 10000; timer_millis && !check_keys();) {
+            data_convert(); // ждем, преобразование данных
+            if (!timer_dot) {
+              indiClr();
+              if (!dot_state) {
+                indiPrint("TOUT", 0);
+              }
+              dot_state = !dot_state; //инвертируем точки
+              timer_dot = 500;
+            }
+          }
+          disableSleep = 0; //разрешаем сон
+        }
+      }
       //опрос акб
       if (tmr_bat >= BAT_TIME) { //если пришло время опросит акб
         tmr_bat = 0; //сбрасываем таймер
@@ -224,17 +249,7 @@ void sleepMode(void) //режим сна
 
   switch (tmr_sleep) {
     case 0:
-      if (_sleep) {
-        _sleep = 0; //сбрасываем флаг активного сна
-        _mode = 0; //переходим в режим часов
-        TWI_enable(); //включение TWI
-        TimeGetDate(time); //синхронизируем время
-        switch (_bright_mode) {
-          case 1: indiSetBright(brightDefault[indiBright[readLightSens()]]); break; //установка яркости индикаторов
-          case 2: indiSetBright(brightDefault[indiBright[changeBright()]]); break; //установка яркости индикаторов
-        }
-        indiDisableSleep(); //включаем дисплей
-      }
+      if (_sleep) sleepOut(); //выход из сна
       break;
 
     case SLEEP_TIME:
@@ -245,6 +260,19 @@ void sleepMode(void) //режим сна
       }
       break;
   }
+}
+//-------------------------------------Выход из сна--------------------------------------------------------
+void sleepOut(void) //выход из сна
+{
+  _sleep = 0; //сбрасываем флаг активного сна
+  _mode = 0; //переходим в режим часов
+  TWI_enable(); //включение TWI
+  TimeGetDate(time); //синхронизируем время
+  switch (_bright_mode) {
+    case 1: indiSetBright(brightDefault[indiBright[readLightSens()]]); break; //установка яркости индикаторов
+    case 2: indiSetBright(brightDefault[indiBright[changeBright()]]); break; //установка яркости индикаторов
+  }
+  indiDisableSleep(); //включаем дисплей
 }
 //-------------------------------------Ожидание--------------------------------------------------------
 void waint_pwr(void) //ожидание
@@ -292,23 +320,6 @@ boolean readLightSens(void) //чтение датчика освещённост
   result /= 10; //находим среднее значение
   ADC_disable(); //выключение ADC
   return (result > 128) ? 1 : 0; //возвращаем результат
-}
-//-------------------------------Чтение датчика освещённости--------------------------------------------------
-uint8_t readLightSensADC(void) //чтение датчика освещённости
-{
-  uint16_t result = 0; //результат опроса АЦП внутреннего опорного напряжения
-  ADC_enable(); //включение ADC
-  ADMUX = 0b01100110; //выбор внешнего опорного и А6
-  ADCSRA = 0b11100111; //настройка АЦП
-
-  for (uint8_t i = 0; i < 10; i++) { //делаем 10 замеров
-    while ((ADCSRA & 0x10) == 0); //ждем флага прерывания АЦП
-    ADCSRA |= 0x10; //сбрасываем флаг прерывания
-    result += ADCH; //прибавляем замер в буфер
-  }
-  result /= 10; //находим среднее значение
-  ADC_disable(); //выключение ADC
-  return result; //возвращаем результат
 }
 //----------------------------------Чтение напряжения батареи-------------------------------------------------
 uint8_t Read_VCC(void)  //чтение напряжения батареи
@@ -849,41 +860,75 @@ void main_screen(void) //главный экран
         indiPrintNum(time[5], 2, 2, '0'); //вывод минут
         break;
       case 1:
+        indiPrint("B", 0);
+        indiPrintNum(bat, 1, 3, ' '); //вывод заряда акб
+        dot_state = 0; //выключаем точки
+        break;
+      case 2:
+        if (!_timer_mode) {
+          indiPrint("T", 0);
+          indiPrintNum(timerDefault[_timer_preset], 2); //вывод времени таймера
+        }
+        else {
+          indiPrintNum(_timer_secs / 60, 0, 2, '0'); //вывод минут
+          indiPrintNum(_timer_secs & 60, 2, 2, '0'); //вывод секунд
+        }
+        switch (_timer_mode) {
+          case 0: dot_state = 1; break; //включаем точки
+          case 1: dot_state = 0; break; //выключаем точки
+        }
+        break;
+      case 3:
         indiPrintNum(time[1], 0, 2, '0'); //вывод месяца
         indiPrintNum(time[2], 2, 2, '0'); //вывод даты
         dot_state = 1; //включаем точки
         break;
-      case 2:
-        //indiPrint("B", 0);
-        //indiPrintNum(bat, 1, 3, ' '); //вывод заряда акб
-        indiPrintNum(readLightSensADC(), 1, 3, ' '); //вывод заряда ацп
-        dot_state = 0; //выключаем точки
-        break;
     }
   }
 
-  if (!_sleep && !_mode && !timer_dot) {
+  if (!_sleep && (!_mode || _timer_mode == 2) && !timer_dot) {
     dot_state = !dot_state; //инвертируем точки
     timer_dot = 500;
   }
 
   switch (check_keys()) {
     case 1: //left key press
-      _mode = (!_mode) ? 2 : 0;
+      switch (_timer_mode) {
+        case 0: if (_mode < 2) _mode++; else _mode = 0; break;
+        case 1:
+          if (_timer_preset > 0) _timer_preset++; else _timer_preset = 6;
+          _timer_secs = timerDefault[_timer_preset] * 60;
+          break;
+        case 2: _timer_mode = 1; break;
+      }
       scr = 0;
       break;
 
     case 2: //right key press
-      _mode = (!_mode) ? 1 : 0;
+      switch (_timer_mode) {
+        case 0: _mode = (!_mode) ? 3 : 0; break;
+        case 1:
+          if (_timer_preset < 6) _timer_preset++; else _timer_preset = 0;
+          _timer_secs = timerDefault[_timer_preset] * 60;
+          break;
+        case 2: _timer_mode = 1; break;
+      }
       scr = 0;
       break;
 
     case 3: //left key hold
-      settings_time(); //настройки
+      if (_mode != 2) settings_time(); //настройки времени
+      else {
+        if (_timer_mode == 2) _timer_secs = timerDefault[_timer_preset] * 60;
+        _timer_mode = (_timer_mode != 2) ? 2 : 0;
+      }
+      scr = 0;
       break;
 
     case 4: //right key hold
-      settings_bright();
+      if (_mode != 2) settings_bright(); //настройки яркости
+      else _timer_mode = (!_timer_mode) ? 1 : 0;
+      scr = 0;
       break;
   }
 }
