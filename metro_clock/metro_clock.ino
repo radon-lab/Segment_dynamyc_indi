@@ -278,7 +278,7 @@ void sleep_pwr(void) //uлубокий сон
 boolean readLightSens(void) //чтение датчика освещённости
 {
   uint16_t result = 0; //результат опроса АЦП внутреннего опорного напряжения
-
+  ADC_enable(); //включение ADC
   ADMUX = 0b01100110; //выбор внешнего опорного и А6
   ADCSRA = 0b11100111; //настройка АЦП
 
@@ -288,6 +288,7 @@ boolean readLightSens(void) //чтение датчика освещённост
     result += ADCH; //прибавляем замер в буфер
   }
   result /= 10; //находим среднее значение
+  ADC_disable(); //выключение ADC
   return (result > 128) ? 1 : 0; //возвращаем результат
 }
 //----------------------------------Чтение напряжения батареи-------------------------------------------------
@@ -568,22 +569,22 @@ void settings_bright(void)
       switch (cur_mode) {
         case 0:
           indiPrint("FL", 0); //вывод 2000
-          if (!blink_data) indiPrintNum(indiBright[0] + 1, 3); //режим колбы
+          if (!blink_data) indiPrintNum(indiBright[0], 3); //режим колбы
           break;
         case 1:
           indiPrint("BR", 0);
-          if (!blink_data) indiPrintNum(_bright_mode + 1, 3); //режим подсветки
+          if (!blink_data) indiPrintNum(_bright_mode, 3); //режим подсветки
           break;
         case 2:
           switch (_bright_mode) {
             case 0: //ручная подсветка
               indiPrint("L", 0);
-              if (!blink_data) indiPrintNum(_bright_levle, 2, 2, '0'); //вывод яркости
+              if (!blink_data) indiPrintNum(_bright_levle + 1, 2, 2, '0'); //вывод яркости
               break;
 
             case 1: //авто-подсветка
               indiPrint("N", 0);
-              if (!blink_data) indiPrintNum(indiBright[0], 2, 2, '0'); //вывод яркости ночь
+              if (!blink_data) indiPrintNum(indiBright[0] + 1, 2, 2, '0'); //вывод яркости ночь
               break;
 
             case 2: //подсветка день/ночь
@@ -596,7 +597,7 @@ void settings_bright(void)
           switch (_bright_mode) {
             case 1:
               indiPrint("D", 0);
-              if (!blink_data) indiPrintNum(indiBright[1], 2, 2, '0'); //вывод яркости день
+              if (!blink_data) indiPrintNum(indiBright[1] + 1, 2, 2, '0'); //вывод яркости день
               break;
 
             case 2:
@@ -794,13 +795,13 @@ void settings_bright(void)
         eeprom_update_byte((uint8_t*)11, _flask_mode); //записываем в память режим колбы
         eeprom_update_byte((uint8_t*)12, _bright_mode); //записываем в память режим подсветки
         eeprom_update_byte((uint8_t*)13, _bright_levle); //записываем в память уровень подсветки
-        
+
         switch (_bright_mode) {
           case 0: indiSetBright(brightDefault[_bright_levle]); break; //установка яркости индикаторов
           case 1: indiSetBright(brightDefault[indiBright[readLightSens()]]); break; //установка яркости индикаторов
           case 2: indiSetBright(brightDefault[indiBright[changeBright()]]); break; //установка яркости индикаторов
         }
-        
+
         dot_state = 0; //выключаем точку
         indiClr(); //очистка индикаторов
         indiPrint("OUT", 0);
