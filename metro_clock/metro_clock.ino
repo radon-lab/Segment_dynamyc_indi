@@ -16,6 +16,14 @@ boolean btn_check; //флаг разрешения опроса кнопки
 boolean btn_state; //флаг текущего состояния кнопки
 
 uint8_t _mode = 0; //текущий основной режим
+uint8_t _flask_mode = 2; //текущий режим свечения колбы
+
+uint8_t _bright_mode = 0; //текущий режим подсветки
+uint8_t _bright_levle = 0; //текущая яркость подсветки
+
+uint8_t timeBright[] = { 23, 8 }; //массив времени 0 - ночь, 1 - день
+uint8_t indiBright[] = { 0, 4 }; //массив подсветки 0 - ночь, 1 - день
+
 boolean scr = 0; //флаг обновления экрана
 boolean disableSleep = 0; //флаг запрета сна
 
@@ -23,8 +31,6 @@ uint8_t bat = 100; //заряд акб
 uint8_t tmr_sleep = 0; //счетчик ухода в сон
 boolean _sleep = 0; //влаг активного сна
 
-uint8_t timeBright[] = { 23, 8 }; //массив времени 0 - ночь, 1 - день
-uint8_t indiBright[] = { 0, 4 }; //массив подсветки 0 - ночь, 1 - день
 uint8_t time[7]; //массив времени(год, месяц, день, день_недели, часы, минуты, секунды)
 
 volatile boolean power_off = 0; //флаг отключения питания
@@ -63,15 +69,24 @@ int main(void)  //инициализация
     indiPrint("####", 1); //отрисовка сообщения
   }
 
+  dot_state = 1; //включаем точки
+  flask_state = 1; //включаем колбу
+
   if (eeprom_read_byte((uint8_t*)100) != 100) { //если первый запуск, восстанавливаем из переменных
     eeprom_update_byte((uint8_t*)100, 100); //делаем метку
     eeprom_update_block((void*)&timeDefault, 0, sizeof(timeDefault)); //записываем дату по умолчанию в память
     eeprom_update_block((void*)&timeBright, 7, sizeof(timeBright)); //записываем время в память
     eeprom_update_block((void*)&indiBright, 9, sizeof(indiBright)); //записываем яркость в память
+    eeprom_update_byte((uint8_t*)11, _flask_mode); //записываем в память режим колбы
+    eeprom_update_byte((uint8_t*)12, _bright_mode); //записываем в память режим подсветки
+    eeprom_update_byte((uint8_t*)13, _bright_levle); //записываем в память уровень подсветки
   }
   else {
     eeprom_read_block((void*)&timeBright, 7, sizeof(timeBright)); //считываем время из памяти
     eeprom_read_block((void*)&indiBright, 9, sizeof(indiBright)); //считываем яркость из памяти
+    _flask_mode = eeprom_read_byte((uint8_t*)11); //считываем режим колбы из памяти
+    _bright_mode = eeprom_read_byte((uint8_t*)12); //считываем режим подсветки из памяти
+    _bright_levle = eeprom_read_byte((uint8_t*)13); //считываем уровень подсветки из памяти
   }
 
   TimeGetDate(time); //синхронизация времени
@@ -82,7 +97,13 @@ int main(void)  //инициализация
   }
   for (timer_millis = 2000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
 
-  indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
+  flask_state = _flask_mode; //обновление стотояния колбы
+
+  switch (_bright_mode) {
+    case 0: indiSetBright(brightDefault[_bright_levle]); break; //установка яркости индикаторов
+    case 1: indiSetBright(brightDefault[indiBright[readLightSens()]]); break; //установка яркости индикаторов
+    case 2: indiSetBright(brightDefault[indiBright[changeBright()]]); break; //установка яркости индикаторов
+  }
 
   //----------------------------------Главная-------------------------------------------------------------
   for (;;) //главная
@@ -100,8 +121,18 @@ ISR(INT0_vect) //внешнее прерывание на пине INT0 - вкл
     _batCheck(); //проверяем заряд акб
     if (bat > PWR_BAT_P) { //если батарея не разряжена
       TimeGetDate(time); //синхронизируем время
-      indiDisableSleep(brightDefault[indiBright[changeBright()]]); //включаем дисплей
+
+      switch (_bright_mode) {
+        case 0: indiSetBright(brightDefault[_bright_levle]); break; //установка яркости индикаторов
+        case 1: indiSetBright(brightDefault[indiBright[readLightSens()]]); break; //установка яркости индикаторов
+        case 2: indiSetBright(brightDefault[indiBright[changeBright()]]); break; //установка яркости индикаторов
+      }
+
+      indiDisableSleep(); //включаем дисплей
       indiPrint("####", 1); //отрисовка сообщения
+
+      dot_state = 1; //включаем точки
+      flask_state = 1; //включаем колбу
 
       while (!RIGHT_OUT); //ждем пока отпустят кнопу
 
@@ -112,7 +143,8 @@ ISR(INT0_vect) //внешнее прерывание на пине INT0 - вкл
       power_off = 0; //флаг выключения питания
     }
     else { //иначе выводим предупреждение об разряженной батарее
-      indiDisableSleep(255); //включаем дисплей
+      indiSetBright(127); //устанавливаем максимальную яркость
+      indiDisableSleep(); //включаем дисплей
       indiPrint("LO", 1); //отрисовка сообщения разряженной батареи
       _delay_ms(2000); //ждём
       indiEnableSleep(); //выключаем дисплей
@@ -151,10 +183,12 @@ void data_convert(void) //преобразование данных
             if (++time[4] > 23) { //часы
               time[4] = 0;
             }
-            indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
+            if (!disableSleep && _bright_mode == 2) indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
           }
           TimeGetDate(time); //синхронизируем время
         }
+        if (_flask_mode == 2) flask_state = readLightSens(); //автоматическое включение колбы
+        if (!disableSleep && _bright_mode == 1) indiSetBright(brightDefault[indiBright[readLightSens()]]); //установка яркости индикаторов
         scr = 0;
       }
       //опрос акб
@@ -193,7 +227,11 @@ void sleepMode(void) //режим сна
         _mode = 0; //переходим в режим часов
         TWI_enable(); //включение TWI
         TimeGetDate(time); //синхронизируем время
-        indiDisableSleep(brightDefault[indiBright[changeBright()]]); //включаем дисплей
+        switch (_bright_mode) {
+          case 1: indiSetBright(brightDefault[indiBright[readLightSens()]]); break; //установка яркости индикаторов
+          case 2: indiSetBright(brightDefault[indiBright[changeBright()]]); break; //установка яркости индикаторов
+        }
+        indiDisableSleep(); //включаем дисплей
       }
       break;
 
@@ -226,7 +264,7 @@ void save_pwr(void) //энергосбережение
 
   asm ("sleep");  //с этого момента спим.
 }
-//-------------------------------------Глубокий сон--------------------------------------------------------
+//-------------------------------------Глубокий сон-----------------------------------------------------------
 void sleep_pwr(void) //uлубокий сон
 {
   SMCR = (0x2 << 1) | (1 << SE);  //устанавливаем режим сна powerdown
@@ -236,7 +274,23 @@ void sleep_pwr(void) //uлубокий сон
 
   asm ("sleep");  //с этого момента спим.
 }
-//--------------------------------Чтение напряжения батареи-------------------------------------
+//-------------------------------Чтение датчика освещённости--------------------------------------------------
+boolean readLightSens(void) //чтение датчика освещённости
+{
+  uint16_t result = 0; //результат опроса АЦП внутреннего опорного напряжения
+
+  ADMUX = 0b01100110; //выбор внешнего опорного и А6
+  ADCSRA = 0b11100111; //настройка АЦП
+
+  for (uint8_t i = 0; i < 10; i++) { //делаем 10 замеров
+    while ((ADCSRA & 0x10) == 0); //ждем флага прерывания АЦП
+    ADCSRA |= 0x10; //сбрасываем флаг прерывания
+    result += ADCH; //прибавляем замер в буфер
+  }
+  result /= 10; //находим среднее значение
+  return (result > 128) ? 1 : 0; //возвращаем результат
+}
+//----------------------------------Чтение напряжения батареи-------------------------------------------------
 uint8_t Read_VCC(void)  //чтение напряжения батареи
 {
   ADC_enable(); //включение ADC
@@ -298,6 +352,8 @@ void _PowerDown(void)
   indiEnableSleep(); //выключаем дисплей
   TWI_disable(); //выключение TWI
   WDT_disable(); //выключение WDT
+  dot_state = 0; //выключаем точки
+  flask_state = 0; //выключаем колбу
   power_off = 1; //устанавливаем флаг
   while (power_off) sleep_pwr();
 }
@@ -475,7 +531,7 @@ void settings_time(void)
 
       case 4: //right hold
         eeprom_update_block((void*)&time, 0, sizeof(time)); //записываем дату в память
-        indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
+        if (_bright_mode == 2) indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
         TimeSetDate(time); //обновляем время
         dot_state = 0; //выключаем точку
         indiClr(); //очистка индикаторов
@@ -496,7 +552,7 @@ void settings_bright(void)
 
   disableSleep = 1; //запрещаем сон
 
-  dot_state = 0; //включаем точку
+  dot_state = 0; //выключаем точку
   indiClr(); //очищаем индикаторы
   indiPrint("BRI", 0);
   for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
@@ -511,20 +567,51 @@ void settings_bright(void)
       indiClr(); //очистка индикаторов
       switch (cur_mode) {
         case 0:
-          indiPrint("N", 0);
-          if (!blink_data) indiPrintNum(timeBright[0], 2, 2, '0'); //вывод время включения ночной подсветки
+          indiPrint("FL", 0); //вывод 2000
+          if (!blink_data) indiPrintNum(indiBright[0] + 1, 3); //режим колбы
           break;
         case 1:
-          indiPrint("BR", 0); //вывод 2000
-          if (!blink_data) indiPrintNum(indiBright[0] + 1, 3); //вывод яркости
+          indiPrint("BR", 0);
+          if (!blink_data) indiPrintNum(_bright_mode + 1, 3); //режим подсветки
           break;
         case 2:
+          switch (_bright_mode) {
+            case 0: //ручная подсветка
+              indiPrint("L", 0);
+              if (!blink_data) indiPrintNum(_bright_levle, 2, 2, '0'); //вывод яркости
+              break;
+
+            case 1: //авто-подсветка
+              indiPrint("N", 0);
+              if (!blink_data) indiPrintNum(indiBright[0], 2, 2, '0'); //вывод яркости ночь
+              break;
+
+            case 2: //подсветка день/ночь
+              indiPrint("N", 0);
+              if (!blink_data) indiPrintNum(timeBright[0], 2, 2, '0'); //вывод время включения ночной подсветки
+              break;
+          }
+          break;
+        case 3:
+          switch (_bright_mode) {
+            case 1:
+              indiPrint("D", 0);
+              if (!blink_data) indiPrintNum(indiBright[1], 2, 2, '0'); //вывод яркости день
+              break;
+
+            case 2:
+              indiPrint("L", 0); //вывод 2000
+              if (!blink_data) indiPrintNum(indiBright[0] + 1, 3); //вывод яркости ночь
+              break;
+          }
+          break;
+        case 4:
           indiPrint("D", 0);
           if (!blink_data) indiPrintNum(timeBright[1], 2, 2, '0'); //вывод время включения дневной подсветки
           break;
-        case 3:
-          indiPrint("BR", 0); //вывод 2000
-          if (!blink_data) indiPrintNum(indiBright[1] + 1, 3); //вывод яркости
+        case 5:
+          indiPrint("L", 0); //вывод 2000
+          if (!blink_data) indiPrintNum(indiBright[1] + 1, 3); //вывод яркости день
           break;
       }
       blink_data = !blink_data; //мигание сигментами
@@ -534,16 +621,57 @@ void settings_bright(void)
     switch (check_keys()) {
       case 1: //left click
         switch (cur_mode) {
-          //настройка ночной подсветки
-          case 0: if (timeBright[0] > 0) timeBright[0]--; else timeBright[0] = 23; break; //часы
+          //настройка режима подсветки и колбы
+          case 0:
+            if (_flask_mode > 0) _flask_mode--; else _flask_mode = 2;
+            flask_state = _flask_mode; //обновление стотояния колбы
+            break;
           case 1:
-            if (indiBright[0] > 0) indiBright[0]--; else indiBright[0] = 4;
-            indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+            if (_bright_mode > 0) _bright_mode--; else _bright_mode = 2;
+            switch (_bright_mode) {
+              case 0: indiSetBright(brightDefault[_bright_levle]); break; //установка яркости индикаторов
+              case 1:
+              case 2:
+                indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+                break;
+            }
+            break;
+
+          //настройка ночной подсветки
+          case 2:
+            switch (_bright_mode) {
+              case 0: //ручная подсветка
+                if (_bright_levle > 0) _bright_levle--; else _bright_levle = 4;
+                indiSetBright(brightDefault[_bright_levle]); //установка яркости индикаторов
+                break;
+
+              case 1: //авто-подсветка
+                if (indiBright[0] > 0) indiBright[0]--; else indiBright[0] = 4;
+                indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+                break;
+
+              case 2: //часы
+                if (timeBright[0] > 0) timeBright[0]--; else timeBright[0] = 23; //часы
+                break;
+            }
+            break;
+          case 3:
+            switch (_bright_mode) {
+              case 1:
+                if (indiBright[1] > 0) indiBright[1]--; else indiBright[1] = 4;
+                indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
+                break;
+
+              case 2:
+                if (indiBright[0] > 0) indiBright[0]--; else indiBright[0] = 4;
+                indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+                break;
+            }
             break;
 
           //настройка дневной подсветки
-          case 2: if (timeBright[1] > 0) timeBright[1]--; else timeBright[1] = 23; break; //часы
-          case 3:
+          case 4: if (timeBright[1] > 0) timeBright[1]--; else timeBright[1] = 23; break; //часы
+          case 5:
             if (indiBright[1] > 0) indiBright[1]--; else indiBright[1] = 4;
             indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
             break;
@@ -553,16 +681,57 @@ void settings_bright(void)
 
       case 2: //right click
         switch (cur_mode) {
-          //настройка ночной подсветки
-          case 0: if (timeBright[0] < 23) timeBright[0]++; else timeBright[0] = 0; break; //часы
+          //настройка режима подсветки и колбы
+          case 0:
+            if (_flask_mode < 2) _flask_mode++; else _flask_mode = 0;
+            flask_state = _flask_mode; //обновление стотояния колбы
+            break;
           case 1:
-            if (indiBright[0] < 4) indiBright[0]++; else indiBright[0] = 0;
-            indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+            if (_bright_mode < 2) _bright_mode++; else _bright_mode = 0;
+            switch (_bright_mode) {
+              case 0: indiSetBright(brightDefault[_bright_levle]); break; //установка яркости индикаторов
+              case 1:
+              case 2:
+                indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+                break;
+            }
+            break;
+
+          //настройка ночной подсветки
+          case 2:
+            switch (_bright_mode) {
+              case 0: //ручная подсветка
+                if (_bright_levle < 4) _bright_levle++; else _bright_levle = 0;
+                indiSetBright(brightDefault[_bright_levle]); //установка яркости индикаторов
+                break;
+
+              case 1: //авто-подсветка
+                if (indiBright[0] < 4) indiBright[0]++; else indiBright[0] = 0;
+                indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+                break;
+
+              case 2: //часы
+                if (timeBright[0] < 23) timeBright[0]++; else timeBright[0] = 0; //часы
+                break;
+            }
+            break;
+          case 3:
+            switch (_bright_mode) {
+              case 1:
+                if (indiBright[1] < 4) indiBright[1]++; else indiBright[1] = 0;
+                indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
+                break;
+
+              case 2:
+                if (indiBright[0] < 4) indiBright[0]++; else indiBright[0] = 0;
+                indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+                break;
+            }
             break;
 
           //настройка дневной подсветки
-          case 2: if (timeBright[1] < 23) timeBright[1]++; else timeBright[1] = 0; break; //часы
-          case 3:
+          case 4: if (timeBright[1] < 23) timeBright[1]++; else timeBright[1] = 0; break; //часы
+          case 5:
             if (indiBright[1] < 4) indiBright[1]++; else indiBright[1] = 0;
             indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
             break;
@@ -571,16 +740,45 @@ void settings_bright(void)
         break;
 
       case 3: //left hold
-        if (cur_mode < 3) cur_mode++; else cur_mode = 0;
+        switch (_bright_mode) {
+          case 0: if (cur_mode < 2) cur_mode++; else cur_mode = 0; break;
+          case 1: if (cur_mode < 3) cur_mode++; else cur_mode = 0; break;
+          case 2: if (cur_mode < 5) cur_mode++; else cur_mode = 0; break;
+        }
         switch (cur_mode) {
           case 0:
             indiClr(); //очистка индикаторов
-            indiPrint("N", 0);
+            indiPrint("F", 0);
             for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
-            indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+            if (_bright_mode) indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+            else indiSetBright(brightDefault[_bright_levle]); //установка яркости индикаторов
+            break;
+
+          case 1:
+            indiClr(); //очистка индикаторов
+            indiPrint("B", 0);
+            for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
             break;
 
           case 2:
+            indiClr(); //очистка индикаторов
+            if (_bright_mode) indiPrint("N", 0);
+            else indiPrint("L", 0);
+            for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
+            if (_bright_mode) indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+            else indiSetBright(brightDefault[_bright_levle]); //установка яркости индикаторов
+            break;
+
+          case 3:
+            if (_bright_mode == 1) {
+              indiClr(); //очистка индикаторов
+              indiPrint("D", 0);
+              for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
+              indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
+            }
+            break;
+
+          case 4:
             indiClr(); //очистка индикаторов
             indiPrint("D", 0);
             for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
@@ -593,7 +791,16 @@ void settings_bright(void)
       case 4: //right hold
         eeprom_update_block((void*)&timeBright, 7, sizeof(timeBright)); //записываем время в память
         eeprom_update_block((void*)&indiBright, 9, sizeof(indiBright)); //записываем яркость в память
-        indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
+        eeprom_update_byte((uint8_t*)11, _flask_mode); //записываем в память режим колбы
+        eeprom_update_byte((uint8_t*)12, _bright_mode); //записываем в память режим подсветки
+        eeprom_update_byte((uint8_t*)13, _bright_levle); //записываем в память уровень подсветки
+        
+        switch (_bright_mode) {
+          case 0: indiSetBright(brightDefault[_bright_levle]); break; //установка яркости индикаторов
+          case 1: indiSetBright(brightDefault[indiBright[readLightSens()]]); break; //установка яркости индикаторов
+          case 2: indiSetBright(brightDefault[indiBright[changeBright()]]); break; //установка яркости индикаторов
+        }
+        
         dot_state = 0; //выключаем точку
         indiClr(); //очистка индикаторов
         indiPrint("OUT", 0);

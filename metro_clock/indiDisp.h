@@ -22,7 +22,7 @@ volatile uint8_t indi_state;
 
 void indiInit(void);
 void indiEnableSleep(void);
-void indiDisableSleep(uint8_t pwm = 255);
+void indiDisableSleep(void);
 void indiSetBright(uint8_t indi, uint8_t pwm);
 void flashSetBright(uint8_t flash, uint8_t pwm);
 void indiSetBright(uint8_t pwm);
@@ -90,11 +90,11 @@ void indiInit(void) //инициализация индикаторов
     setPin(cathodeMask[i], 1);
     outPin(cathodeMask[i]);
     indi_buf[i] = 0;
-    indi_dimm[i] = 255;
+    indi_dimm[i] = 127;
   }
 
   for (byte i = 0; i < 2; i++) {
-    flash_dimm[i] = 255;
+    flash_dimm[i] = 127;
   }
 
   OCR2A = indi_dimm[0];
@@ -116,17 +116,15 @@ void indiInit(void) //инициализация индикаторов
 void indiEnableSleep(void) //включение режима сна
 {
   _INDI_OFF; //отключаем генирацию
-  for (uint8_t i = 0; i < 4; i++) indi_buf[i] = 0; //очищаем буфер
   for (uint8_t i = 0; i < 7; i++) setPin(anodeMask[i], 0); //сбрасываем пины
   for (uint8_t i = 0; i < 4; i++) setPin(cathodeMask[i], 1); //сбрасываем пины
   DOT_OFF; //выключаем точки
   FLASK_OFF; //выключаем колбу
 }
 //---------------------------------Выключение режима сна---------------------------------------
-void indiDisableSleep(uint8_t pwm) //выключение режима сна
+void indiDisableSleep(void) //выключение режима сна
 {
-  if (!pwm) pwm = 1;
-  for (uint8_t i = 0; i < 4; i++) indi_dimm[i] = 128 + pwm; //устанавливаем максимальную яркость
+  for (uint8_t i = 0; i < 4; i++) indi_buf[i] = 0; //очищаем буфер
   _INDI_ON; //запускаем генерацию
 }
 //---------------------------------Установка яркости индикатора---------------------------------------
