@@ -898,7 +898,7 @@ void main_screen(void) //главный экран
       switch (_timer_mode) {
         case 0: if (_mode < 2) _mode++; else _mode = 0; break;
         case 1:
-          if (_timer_preset > 0) _timer_preset++; else _timer_preset = 6;
+          if (_timer_preset > 0) _timer_preset--; else _timer_preset = 6;
           _timer_secs = timerDefault[_timer_preset] * 60;
           break;
         case 2: _timer_mode = 1; break;
