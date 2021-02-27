@@ -23,6 +23,7 @@ uint16_t _timer_secs = timerDefault[_timer_preset] * 60; //установлен�
 uint8_t _flask_mode = 2; //текущий режим свечения колбы
 uint8_t _bright_mode = 0; //текущий режим подсветки
 uint8_t _bright_levle = 0; //текущая яркость подсветки
+uint8_t _bright_block = 0; //блокировка изменения яркости подсветки яркость подсветки
 
 uint8_t timeBright[] = { 23, 8 }; //массив времени 0 - ночь, 1 - день
 uint8_t indiBright[] = { 0, 4 }; //массив подсветки 0 - ночь, 1 - день
@@ -188,12 +189,12 @@ void data_convert(void) //преобразование данных
             if (++time[4] > 23) { //часы
               time[4] = 0;
             }
-            if (!disableSleep && _bright_mode == 2) indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
+            if (!_bright_block && _bright_mode == 2) indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
           }
           TimeGetDate(time); //синхронизируем время
         }
         if (_flask_mode == 2) flask_state = readLightSens(); //автоматическое включение колбы
-        if (!disableSleep && _bright_mode == 1) indiSetBright(brightDefault[indiBright[readLightSens()]]); //установка яркости индикаторов
+        if (!_bright_block && _bright_mode == 1) indiSetBright(brightDefault[indiBright[readLightSens()]]); //установка яркости индикаторов
         scr = 0;
       }
       //таймер часов
@@ -216,6 +217,7 @@ void data_convert(void) //преобразование данных
               timer_dot = 500;
             }
           }
+          _timer_secs = timerDefault[_timer_preset] * 60;
           _mode = 0; //переходим в режим часов
           _timer_mode = 0; //сбрасываем режим таймера
           disableSleep = 0; //разрешаем сон
@@ -590,7 +592,7 @@ void settings_bright(void)
   indiClr(); //очищаем индикаторы
   indiPrint("BRI", 0);
   for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
-  if (_bright_mode) indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
+  if (_bright_mode) indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
 
   //настройки
   while (1) {
@@ -780,7 +782,8 @@ void settings_bright(void)
             indiClr(); //очистка индикаторов
             indiPrint("F", 0);
             for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
-            if (_bright_mode) indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
+            if (_bright_mode == 2) indiSetBright(brightDefault[indiBright[changeBright()]]); //установка яркости индикаторов
+            _bright_block = 0; //разрешаем управление подсветкой
             break;
 
           case 1:
@@ -794,8 +797,11 @@ void settings_bright(void)
             if (_bright_mode) indiPrint("N", 0);
             else indiPrint("L", 0);
             for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
-            if (_bright_mode) indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
-            else indiSetBright(brightDefault[_bright_levle]); //установка яркости индикаторов
+            switch (_bright_mode) {
+              case 0: indiSetBright(brightDefault[_bright_levle]); break; //установка яркости индикаторов
+              case 1: indiSetBright(brightDefault[indiBright[0]]); _bright_block = 1; break; //установка яркости индикаторов
+              case 2: indiSetBright(brightDefault[indiBright[changeBright()]]); break; //установка яркости индикаторов
+            }
             break;
 
           case 3:
@@ -805,13 +811,23 @@ void settings_bright(void)
               for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
               indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
             }
+            else {
+              indiSetBright(brightDefault[indiBright[0]]);
+              _bright_block = 1; //запрещаем управление подсветкой
+            }
             break;
 
           case 4:
             indiClr(); //очистка индикаторов
             indiPrint("D", 0);
             for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
-            indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
+            indiSetBright(brightDefault[changeBright()]); //установка яркости индикаторов
+            _bright_block = 0; //разрешаем управление подсветкой
+            break;
+
+          case 5:
+            indiSetBright(brightDefault[indiBright[1]]);
+            _bright_block = 1; //запрещаем управление подсветкой
             break;
         }
         scr = blink_data = 0; //сбрасываем флаги
@@ -835,6 +851,7 @@ void settings_bright(void)
         indiPrint("OUT", 0);
         for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
         disableSleep = 0; //разрешаем сон
+        _bright_block = 0; //разрешаем управление подсветкой
         _mode = 0; //переходим в режим часов
         scr = 0; //обновляем экран
         return;
@@ -868,7 +885,7 @@ void main_screen(void) //главный экран
         break;
       case 2:
         if (!_timer_mode) {
-          indiPrint("T", 0);
+          indiPrint("T ", 0);
           indiPrintNum(timerDefault[_timer_preset], 2, 2, '0'); //вывод времени таймера
         }
         else {
@@ -920,16 +937,16 @@ void main_screen(void) //главный экран
 
     case 3: //left key hold
       if (_mode != 2) settings_time(); //настройки времени
-      else {
-        if (_timer_mode == 2) _timer_secs = timerDefault[_timer_preset] * 60;
-        _timer_mode = (_timer_mode != 2) ? 2 : 0;
-      }
+      else _timer_mode = (!_timer_mode) ? 1 : 0;
       scr = 0;
       break;
 
     case 4: //right key hold
       if (_mode != 2) settings_bright(); //настройки яркости
-      else _timer_mode = (!_timer_mode) ? 1 : 0;
+      else {
+        if (_timer_mode == 2) _timer_secs = timerDefault[_timer_preset] * 60;
+        _timer_mode = (_timer_mode != 2) ? 2 : 0;
+      }
       scr = 0;
       break;
   }
