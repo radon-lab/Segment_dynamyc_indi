@@ -201,6 +201,7 @@ void data_convert(void) //преобразование данных
         _timer_secs--;
         //оповещение окончания таймера
         if (!_timer_secs) {
+          dot_state = 0; //выключаем точки
           tmr_sleep = 0; //сбрасываем таймер сна
           disableSleep = 1; //запрещаем сон
           sleepOut(); //выход из сна
@@ -208,10 +209,10 @@ void data_convert(void) //преобразование данных
             data_convert(); // ждем, преобразование данных
             if (!timer_dot) {
               indiClr();
-              if (!dot_state) {
+              if (!flask_state) {
                 indiPrint("TOUT", 0);
               }
-              dot_state = !dot_state; //инвертируем точки
+              flask_state = !flask_state; //инвертируем колбу
               timer_dot = 500;
             }
           }
@@ -267,7 +268,7 @@ void sleepMode(void) //режим сна
 void sleepOut(void) //выход из сна
 {
   _sleep = 0; //сбрасываем флаг активного сна
-  _mode = 0; //переходим в режим часов
+  if (!_timer_mode) _mode = 0; //если таймер не работает, переходим в режим часов
   TWI_enable(); //включение TWI
   TimeGetDate(time); //синхронизируем время
   switch (_bright_mode) {
@@ -321,7 +322,7 @@ boolean readLightSens(void) //чтение датчика освещённост
   }
   result /= 10; //находим среднее значение
   ADC_disable(); //выключение ADC
-  return (result > 128) ? 1 : 0; //возвращаем результат
+  return (result > 170) ? 1 : 0; //возвращаем результат
 }
 //----------------------------------Чтение напряжения батареи-------------------------------------------------
 uint8_t Read_VCC(void)  //чтение напряжения батареи
@@ -589,7 +590,7 @@ void settings_bright(void)
   indiClr(); //очищаем индикаторы
   indiPrint("BRI", 0);
   for (timer_millis = 1000; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
-  indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
+  if (_bright_mode) indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
 
   //настройки
   while (1) {
@@ -779,8 +780,7 @@ void settings_bright(void)
             indiClr(); //очистка индикаторов
             indiPrint("F", 0);
             for (timer_millis = 500; timer_millis && !check_keys();) data_convert(); // ждем, преобразование данных
-            if (_bright_mode) indiSetBright(brightDefault[indiBright[0]]); //установка яркости индикаторов
-            else indiSetBright(brightDefault[_bright_levle]); //установка яркости индикаторов
+            if (_bright_mode) indiSetBright(brightDefault[indiBright[1]]); //установка яркости индикаторов
             break;
 
           case 1:
