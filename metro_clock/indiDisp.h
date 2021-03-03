@@ -7,8 +7,8 @@ const byte cathodeMask[] = {CATHODE_1, CATHODE_2, CATHODE_3, CATHODE_4}; //по�
 uint8_t indi_buf[4];
 uint8_t indi_dimm[4];
 uint8_t flash_dimm[2];
-boolean dot_state;
-boolean flask_state;
+boolean dot_state = 1;
+boolean flask_state = 1;
 volatile uint8_t indi_state;
 
 #define LEFT 0
@@ -118,6 +118,7 @@ void indiEnableSleep(void) //включение режима сна
   _INDI_OFF; //отключаем генирацию
   for (uint8_t i = 0; i < 7; i++) setPin(anodeMask[i], 0); //сбрасываем пины
   for (uint8_t i = 0; i < 4; i++) setPin(cathodeMask[i], 1); //сбрасываем пины
+  dot_state = 0; //выключаем точки
   DOT_OFF; //выключаем точки
   FLASK_OFF; //выключаем колбу
 }
