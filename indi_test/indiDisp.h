@@ -1,11 +1,11 @@
 #include <Arduino.h>
 #include "font.c"
 
-const byte anodeMask[] = {14, 8, 7, 6, 4, 10, 3};   //порядок и номера пинов анодов индикатора(a, b, c, d, e, f, g)
-const byte cathodeMask[] = {16, 13, 12, 11};       //порядок и номера пинов катодов индикатора(0, 1, 2, 3)
+const byte anodeMask[] = {14, 8, 7, 6, 4, 10, 3};   //порядок и номера пинов анодов индикатора(a, b, c, d, e, f, g)(до 8 пинов)
+const byte cathodeMask[] = {16, 13, 12, 11};       //порядок и номера пинов катодов индикатора(0, 1, 2, 3)(до 10 пинов)
 
-uint8_t indi_buf[4];
-uint8_t indi_dimm[4];
+uint8_t indi_buf[sizeof(cathodeMask)];
+uint8_t indi_dimm[sizeof(cathodeMask)];
 volatile uint8_t indi_state;
 
 #define LEFT 0
@@ -19,8 +19,9 @@ volatile uint8_t indi_state;
 
 void indiInit(void);
 void indiEnableSleep(void);
-void indiDisableSleep(uint8_t pwm = 255);
+void indiDisableSleep(void);
 void indiSetBright(uint8_t indi, uint8_t pwm);
+void indiSetBright(uint8_t pwm);
 void indiClr(void);
 void indiClr(uint8_t indi);
 void indiSet(uint8_t st, uint8_t indi, boolean state = 1);
@@ -43,9 +44,10 @@ void outPin(uint8_t pin) {
 //---------------------------------Генерация символов---------------------------------------
 ISR(TIMER2_OVF_vect) //генерация символов
 {
-  uint8_t data = indi_buf[indi_state];
+  TCNT2 = 126;
 
-  for (uint8_t c = 0; c < 7; c++)
+  uint8_t data = indi_buf[indi_state];
+  for (uint8_t c = 0; c < sizeof(anodeMask); c++)
   {
     setPin(anodeMask[c], data & 0x80);
     data = data << 1;
@@ -55,24 +57,24 @@ ISR(TIMER2_OVF_vect) //генерация символов
 }
 ISR(TIMER2_COMPA_vect) {
   setPin(cathodeMask[indi_state], 1);
-  if (++indi_state > 3) indi_state = 0;
+  if (++indi_state > sizeof(cathodeMask) - 1) indi_state = 0;
 }
 //-------------------------Инициализация индикаторов----------------------------------------------------
 void indiInit(void) //инициализация индикаторов
 {
-  for (uint8_t i = 0; i < 7; i++) {
+  for (uint8_t i = 0; i < sizeof(anodeMask); i++) {
     setPin(anodeMask[i], 0);
     outPin(anodeMask[i]);
   }
 
-  for (uint8_t i = 0; i < 4; i++) {
+  for (uint8_t i = 0; i < sizeof(cathodeMask); i++) {
     setPin(cathodeMask[i], 1);
     outPin(cathodeMask[i]);
     indi_buf[i] = 0;
-    indi_dimm[i] = 255;
+    indi_dimm[i] = 127;
   }
 
-  OCR2A = indi_dimm[indi_state];
+  OCR2A = indi_dimm[0];
 
   TCCR2A = 0b00000000; //отключаем OC2A/OC2B
 #if F_CPU == 16000000UL
@@ -90,27 +92,33 @@ void indiInit(void) //инициализация индикаторов
 void indiEnableSleep(void) //включение режима сна
 {
   _INDI_OFF; //отключаем генирацию
-  for (uint8_t i = 0; i < 4; i++) indi_buf[i] = 0; //очищаем буфер
-  for (uint8_t i = 0; i < 7; i++) setPin(anodeMask[i], 0); //сбрасываем пины
-  for (uint8_t i = 0; i < 4; i++) setPin(cathodeMask[i], 1); //сбрасываем пины
+  for (uint8_t i = 0; i < sizeof(anodeMask); i++) setPin(anodeMask[i], 0); //сбрасываем пины
+  for (uint8_t i = 0; i < sizeof(cathodeMask); i++) setPin(cathodeMask[i], 1); //сбрасываем пины
 }
 //---------------------------------Выключение режима сна---------------------------------------
-void indiDisableSleep(uint8_t pwm) //выключение режима сна
+void indiDisableSleep(void) //выключение режима сна
 {
-  if (pwm < 20) pwm = 20;
-  for (uint8_t i = 0; i < 4; i++) indi_dimm[i] = pwm; //устанавливаем максимальную яркость
+  for (uint8_t i = 0; i < sizeof(cathodeMask); i++) indi_buf[i] = 0; //очищаем буфер
   _INDI_ON; //запускаем генерацию
 }
 //---------------------------------Установка яркости индикатора---------------------------------------
 void indiSetBright(uint8_t indi, uint8_t pwm) //установка яркости индикатора
 {
-  if (pwm < 20) pwm = 20;
-  indi_dimm[indi] = pwm;
+  if (!pwm) pwm = 1;
+  indi_dimm[indi] = 128 + pwm;
+}
+//---------------------------------Установка общей яркости---------------------------------------
+void indiSetBright(uint8_t pwm) //установка общей яркости
+{
+  if (!pwm) pwm = 1;
+  for (byte i = 0; i < sizeof(cathodeMask); i++) {
+    indi_dimm[i] = 128 + pwm;
+  }
 }
 //-------------------------Очистка индикаторов----------------------------------------------------
 void indiClr(void) //очистка индикаторов
 {
-  for (uint8_t i = 0; i < 4; i++) indi_buf[i] = 0;
+  for (uint8_t i = 0; i < sizeof(cathodeMask); i++) indi_buf[i] = 0;
 }
 //-------------------------Очистка индикатора----------------------------------------------------
 void indiClr(uint8_t indi) //очистка индикатора
@@ -120,7 +128,7 @@ void indiClr(uint8_t indi) //очистка индикатора
 //-------------------------Вывод символов----------------------------------------------------
 void indiSet(uint8_t st, uint8_t indi, boolean state) //вывод символов
 {
-  bitWrite(indi_buf[indi], 7 - st, state);
+  bitWrite(indi_buf[indi], sizeof(anodeMask) - st, state);
 }
 //-------------------------Вывод текста----------------------------------------------------
 void indiPrint(const char *st, uint8_t indi) //вывод текста
@@ -128,8 +136,8 @@ void indiPrint(const char *st, uint8_t indi) //вывод текста
   uint8_t stl = strlen(st);
 
   switch (indi) {
-    case RIGHT: indi = 4 - stl; break;
-    case CENTER: indi = 4 - stl / 2; break;
+    case RIGHT: indi = sizeof(cathodeMask) - stl; break;
+    case CENTER: indi = sizeof(cathodeMask) - stl / 2; break;
   }
 
   for (int cnt = 0; cnt < stl; cnt++)
